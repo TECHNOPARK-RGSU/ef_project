@@ -170,6 +170,16 @@ class PresentationType(BaseModel):
         verbose_name="Код типа",
     )
 
+    #Foreign Keys
+
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.PROTECT,
+        related_name="places",
+        verbose_name="Место",
+
+    )
+
     class Meta:
         verbose_name = "Тип представления"
         verbose_name_plural = "Типы представления"
@@ -282,4 +292,20 @@ class Comment(BaseModel):
     class Meta:
         verbose_name = "Комментарий"
         verbose_name_plural = "Комментарии"
+        ordering = ["created_at"]
+
+
+class Place(BaseModel):
+    name = models.CharField(
+        max_length=225,
+        verbose_name="Имя"
+    )
+
+    adress = models.CharField(
+        max_length= 300
+        verbose_name="Адрес"
+    )
+    class Meta():
+        verbose_name = "Место"
+        verbose_name_plural = "Места"
         ordering = ["created_at"]
