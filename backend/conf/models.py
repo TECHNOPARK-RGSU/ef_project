@@ -137,6 +137,25 @@ class ParticipationStage(BaseModel):
         ordering = ["name"]
 
 
+class Place(BaseModel):
+    """Место проведения."""
+
+    name = models.CharField(
+        max_length=225,
+        verbose_name="Имя"
+    )
+
+    address = models.CharField(
+        max_length=300,
+        verbose_name="Адрес"
+    )
+
+    class Meta:
+        verbose_name = "Место"
+        verbose_name_plural = "Места"
+        ordering = ["created_at"]
+
+
 class PresentationType(BaseModel):
     """Тип представления проекта (устный, стендовый, онлайн и т.п.)."""
 
@@ -154,11 +173,10 @@ class PresentationType(BaseModel):
     #Foreign Keys
 
     place = models.ForeignKey(
-        "Place",
+        Place,
         on_delete=models.PROTECT,
-        related_name="places",
+        related_name="presentation_types",
         verbose_name="Место",
-
     )
 
     class Meta:
@@ -273,23 +291,4 @@ class Comment(BaseModel):
     class Meta:
         verbose_name = "Комментарий"
         verbose_name_plural = "Комментарии"
-        ordering = ["created_at"]
-
-
-class Place(BaseModel):
-    name = models.CharField(
-        max_length=225,
-        verbose_name="Имя"
-    )
-
-    address = models.CharField(
-        max_length= 300,
-        verbose_name="Адрес"
-    )
-
-    
-
-    class Meta():
-        verbose_name = "Место"
-        verbose_name_plural = "Места"
         ordering = ["created_at"]
