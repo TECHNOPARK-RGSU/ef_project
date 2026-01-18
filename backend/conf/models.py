@@ -1,6 +1,6 @@
 from django.db import models
 from utils.models import BaseModel
-from auth.models import User
+from users.models import User
 
 
 class Conference(BaseModel):
@@ -40,16 +40,7 @@ class Conference(BaseModel):
         verbose_name = "Конференция"
         verbose_name_plural = "Конференции"
         ordering = ["-start_date"]
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(end_date__gte=models.F("start_date")),
-                name="conference_end_after_start",
-            ),
-            models.UniqueConstraint(
-                fields=["title", "start_date"],
-                name="unique_conference_title_start_date",
-            ),
-        ]
+        
 
 
 class AgeCategory(BaseModel):
@@ -75,12 +66,7 @@ class AgeCategory(BaseModel):
         verbose_name = "Возрастная категория"
         verbose_name_plural = "Возрастные категории"
         ordering = ["min_age", "max_age"]
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(max_age__gte=models.F("min_age")),
-                name="age_category_max_gte_min",
-            )
-        ]
+    
 
 
 class Section(BaseModel):
@@ -108,12 +94,7 @@ class Section(BaseModel):
     class Meta:
         verbose_name = "Секция"
         verbose_name_plural = "Секции"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["conference", "name", "category"],
-                name="unique_section_per_conference_category",
-            )
-        ]
+
 
 
 class ProjectStatus(BaseModel):
@@ -173,7 +154,7 @@ class PresentationType(BaseModel):
     #Foreign Keys
 
     place = models.ForeignKey(
-        Place,
+        "Place",
         on_delete=models.PROTECT,
         related_name="places",
         verbose_name="Место",
@@ -301,10 +282,13 @@ class Place(BaseModel):
         verbose_name="Имя"
     )
 
-    adress = models.CharField(
-        max_length= 300
+    address = models.CharField(
+        max_length= 300,
         verbose_name="Адрес"
     )
+
+    
+
     class Meta():
         verbose_name = "Место"
         verbose_name_plural = "Места"
