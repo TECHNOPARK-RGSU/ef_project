@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from utils.models import BaseModel
 from users.models import User
@@ -5,6 +6,12 @@ from users.models import User
 
 class Conference(BaseModel):
     """Конференция (мероприятие)."""
+
+    FORMAT_CHOICES = (
+        ("online", "Онлайн"),
+        ("offline", "Очно"),
+        ("hybrid", "Смешанный"),
+    )
 
     title = models.CharField(
         max_length=255,
@@ -25,9 +32,15 @@ class Conference(BaseModel):
         verbose_name="Место проведения",
         blank=True,
     )
+    format = models.CharField(
+        max_length=20,
+        choices=FORMAT_CHOICES,
+        default="offline",
+        verbose_name="Формат",
+    )
     is_online = models.BooleanField(
         default=False,
-        verbose_name="Онлайн-формат",
+        verbose_name="Онлайн-формат (устаревшее)",
     )
     organizers = models.ManyToManyField(
         User,
@@ -35,12 +48,29 @@ class Conference(BaseModel):
         related_name="organized_conferences",
         verbose_name="Организаторы",
     )
+    winners_count = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Количество победителей в секции",
+    )
+    prizes_count = models.PositiveIntegerField(
+        default=2,
+        verbose_name="Количество призёров в секции",
+    )
+    results_published = models.BooleanField(
+        default=False,
+        verbose_name="Результаты опубликованы",
+    )
 
     class Meta:
         verbose_name = "Конференция"
         verbose_name_plural = "Конференции"
         ordering = ["-start_date"]
-        
+
+    def clean(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError(
+                {"end_date": "Дата окончания не может быть раньше даты начала."}
+            )
 
 
 class AgeCategory(BaseModel):
@@ -66,7 +96,13 @@ class AgeCategory(BaseModel):
         verbose_name = "Возрастная категория"
         verbose_name_plural = "Возрастные категории"
         ordering = ["min_age", "max_age"]
-    
+
+    def clean(self):
+        if self.min_age is not None and self.max_age is not None:
+            if self.min_age > self.max_age:
+                raise ValidationError(
+                    {"max_age": "Максимальный возраст не может быть меньше минимального."}
+                )
 
 
 class Section(BaseModel):
@@ -292,3 +328,223 @@ class Comment(BaseModel):
         verbose_name = "Комментарий"
         verbose_name_plural = "Комментарии"
         ordering = ["created_at"]
+
+
+class EvaluationCriterion(BaseModel):
+    """Критерий оценки проекта для конференции."""
+
+    STAGE_CHOICES = (
+        ("online", "Заочный этап"),
+        ("offline", "Очный этап"),
+    )
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="criteria",
+        verbose_name="Конференция",
+    )
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Название критерия",
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Описание",
+    )
+    max_score = models.PositiveIntegerField(
+        default=10,
+        verbose_name="Максимальный балл",
+    )
+    stage = models.CharField(
+        max_length=20,
+        choices=STAGE_CHOICES,
+        verbose_name="Этап оценки",
+    )
+
+    class Meta:
+        verbose_name = "Критерий оценки"
+        verbose_name_plural = "Критерии оценки"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "name", "stage"],
+                name="unique_criterion_per_conference",
+            )
+        ]
+
+
+class ProjectScore(BaseModel):
+    """Оценка проекта по критерию."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="scores",
+        verbose_name="Проект",
+    )
+    criterion = models.ForeignKey(
+        EvaluationCriterion,
+        on_delete=models.CASCADE,
+        related_name="scores",
+        verbose_name="Критерий",
+    )
+    evaluator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="evaluations",
+        verbose_name="Оценщик",
+    )
+    score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Баллы",
+    )
+
+    class Meta:
+        verbose_name = "Оценка проекта"
+        verbose_name_plural = "Оценки проектов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "criterion", "evaluator"],
+                name="unique_project_criterion_evaluator",
+            )
+        ]
+
+    def clean(self):
+        if self.score is not None and self.criterion_id is not None:
+            if self.score > self.criterion.max_score:
+                raise ValidationError(
+                    {"score": "Баллы не могут превышать максимум по критерию."}
+                )
+
+
+class ProjectResult(BaseModel):
+    """Итоговый результат проекта по конференции."""
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="results",
+        verbose_name="Конференция",
+    )
+    section = models.ForeignKey(
+        Section,
+        on_delete=models.CASCADE,
+        related_name="results",
+        verbose_name="Секция",
+    )
+    project = models.OneToOneField(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="result",
+        verbose_name="Проект",
+    )
+    online_score = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        verbose_name="Баллы заочного этапа",
+    )
+    offline_score = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        verbose_name="Баллы очного этапа",
+    )
+    total_score = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        verbose_name="Итоговый балл",
+    )
+    rank = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Место",
+    )
+    is_winner = models.BooleanField(
+        default=False,
+        verbose_name="Победитель",
+    )
+    is_prize = models.BooleanField(
+        default=False,
+        verbose_name="Призёр",
+    )
+    published_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Дата публикации",
+    )
+
+    class Meta:
+        verbose_name = "Результат проекта"
+        verbose_name_plural = "Результаты проектов"
+
+
+class ExpertAssignment(BaseModel):
+    """Назначение проектов эксперту для проверки."""
+
+    STAGE_CHOICES = (
+        ("online", "Заочный этап"),
+        ("offline", "Очный этап"),
+    )
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="expert_assignments",
+        verbose_name="Конференция",
+    )
+    expert = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="expert_assignments",
+        verbose_name="Эксперт",
+    )
+    stage = models.CharField(
+        max_length=10,
+        choices=STAGE_CHOICES,
+        default="online",
+        verbose_name="Этап проверки",
+    )
+    max_projects = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Лимит проектов",
+    )
+
+    class Meta:
+        verbose_name = "Назначение эксперту"
+        verbose_name_plural = "Назначения экспертам"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "expert", "stage"],
+                name="unique_conference_expert_stage",
+            )
+        ]
+
+
+class ExpertAssignmentItem(BaseModel):
+    """Конкретный проект в назначении эксперта."""
+
+    assignment = models.ForeignKey(
+        ExpertAssignment,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Назначение",
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="expert_assignments",
+        verbose_name="Проект",
+    )
+
+    class Meta:
+        verbose_name = "Проект эксперта"
+        verbose_name_plural = "Проекты экспертов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assignment", "project"],
+                name="unique_assignment_project",
+            )
+        ]

@@ -3,8 +3,14 @@ name = "backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "django>=6.0",
     "djangorestframework>=3.16.1",
+    "django-filter>=25.1",
+    "django-cors-headers>=4.7.0",
+    "psycopg2-binary>=2.9.11",
+    "openpyxl>=3.1.5",
+    "django-storages>=1.14.4",
+    "boto3>=1.36.0",
 ]

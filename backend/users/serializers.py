@@ -85,11 +85,8 @@ class UserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         user = User.objects.create(**validated_data)
         if password:
-            # В реальном проекте здесь должно быть хэширование пароля
-            # from django.contrib.auth.hashers import make_password
-            # user.password = make_password(password)
-            user.password = password
-            user.save()
+            user.set_password(password)
+            user.save(update_fields=["password"])
         return user
 
     def update(self, instance, validated_data):
@@ -98,10 +95,6 @@ class UserSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:
-            # В реальном проекте здесь должно быть хэширование пароля
-            # from django.contrib.auth.hashers import make_password
-            # instance.password = make_password(password)
-            instance.password = password
+            instance.set_password(password)
         instance.save()
         return instance
-
