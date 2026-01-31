@@ -197,6 +197,9 @@ AUTH_USER_MODEL = "users.User"
 CORS_ALLOW_ALL_ORIGINS = os.getenv("DJANGO_CORS_ALLOW_ALL", "0") == "1"
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:26110").split(",")
+    for origin in os.getenv(
+        "DJANGO_CORS_ALLOWED_ORIGINS",
+        "https://projectaris.jkproduction.pro,http://localhost:26110",
+    ).split(",")
     if origin.strip()
 ]
