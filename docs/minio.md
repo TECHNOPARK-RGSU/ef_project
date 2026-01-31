@@ -10,7 +10,7 @@ MINIO_ROOT_PASSWORD=change-me
 MINIO_BUCKET=ef-project
 MINIO_REGION=ru-central
 MINIO_ENDPOINT=http://minio:9000
-MINIO_PUBLIC_URL=https://minio.example.com
+MINIO_PUBLIC_URL=https://projectaris.jkproduction.pro:26112
 
 AWS_ACCESS_KEY_ID=change-me
 AWS_SECRET_ACCESS_KEY=change-me
