@@ -1,45 +1,76 @@
+@import url("https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600&family=Unbounded:wght@500;700&display=swap");
 @import "../styles/globals.css";
 
 @layer base {
   :root {
-    @apply font-sans;
+    --font-body: "Onest", "Segoe UI", sans-serif;
+    --font-display: "Unbounded", "Trebuchet MS", sans-serif;
   }
 
   body {
-    @apply grid place-items-center min-w-[320px] min-h-screen relative m-0 bg-background text-foreground;
+    font-family: var(--font-body);
+    @apply min-w-[320px] min-h-screen m-0 bg-background text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 }
 
-/* cool Bun background animation 😎 */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
-  opacity: 0.05;
-  background: url("./logo.svg");
-  background-size: 256px;
-  transform: rotate(-12deg) scale(1.35);
-  animation: slide 30s linear infinite;
+  z-index: -2;
+  background:
+    radial-gradient(1200px 600px at 20% 10%, rgba(42, 157, 143, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 80% 5%, rgba(233, 196, 106, 0.24), transparent 60%),
+    radial-gradient(700px 400px at 50% 90%, rgba(244, 162, 97, 0.2), transparent 60%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(249, 248, 242, 0.98));
   pointer-events: none;
 }
 
-@keyframes slide {
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+@keyframes rise {
   from {
-    background-position: 0 0;
+    opacity: 0;
+    transform: translateY(18px);
   }
   to {
-    background-position: 256px 224px;
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0);
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
   }
-  to {
-    transform: rotate(360deg);
+  50% {
+    transform: translateY(-10px);
   }
+}
+
+.animate-rise {
+  animation: rise 0.8s ease-out both;
+}
+
+.animate-floaty {
+  animation: floaty 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion) {
