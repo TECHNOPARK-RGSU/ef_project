@@ -10,11 +10,12 @@ docker compose up
 ```
 
 - Frontend: http://localhost:26110
-- Backend API: http://localhost:26111
+- Backend API: http://localhost:26111 (локально), https://projectaris.jkproduction.pro/api (через reverse proxy)
 - MinIO: http://localhost:26112
 - Postgres: localhost:26113 (внешний, уже запущен)
 
 Примечание: консоль MinIO не публикуется наружу (только API на 26112).
+Примечание: на DSM проксируй путь `/api` на `http://localhost:26111`.
 
 ### Демоданные
 
