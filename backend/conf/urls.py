@@ -10,6 +10,11 @@ from conf.views import (
     PresentationTypeViewSet,
     ProjectViewSet,
     CommentViewSet,
+    EvaluationCriterionViewSet,
+    ProjectScoreViewSet,
+    ProjectResultViewSet,
+    ExpertAssignmentViewSet,
+    ExpertAssignmentItemViewSet,
 )
 
 router = DefaultRouter()
@@ -30,8 +35,12 @@ router.register(
 )
 router.register(r"projects", ProjectViewSet, basename="project")
 router.register(r"comments", CommentViewSet, basename="comment")
+router.register(r"criteria", EvaluationCriterionViewSet, basename="criterion")
+router.register(r"scores", ProjectScoreViewSet, basename="score")
+router.register(r"results", ProjectResultViewSet, basename="result")
+router.register(r"assignments", ExpertAssignmentViewSet, basename="assignment")
+router.register(r"assignment-items", ExpertAssignmentItemViewSet, basename="assignment-item")
 
 urlpatterns = [
     path("", include(router.urls)),
 ]
-

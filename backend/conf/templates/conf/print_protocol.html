@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Протокол результатов</title>
+    <style>
+      body {
+        font-family: "Helvetica", "Arial", sans-serif;
+        margin: 32px;
+        color: #111827;
+      }
+      h1,
+      h2 {
+        margin: 0 0 8px 0;
+      }
+      .meta {
+        margin-bottom: 24px;
+        font-size: 14px;
+        color: #4b5563;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 13px;
+      }
+      th,
+      td {
+        border: 1px solid #d1d5db;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background: #f3f4f6;
+        font-weight: 600;
+      }
+      .section-row td {
+        background: #f9fafb;
+        font-weight: 600;
+      }
+      .signature {
+        margin-top: 48px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Протокол результатов</h1>
+    <div class="meta">
+      <div>Конференция: {{ conference.title }}</div>
+      <div>Дата формирования: {{ generated_at|date:"d.m.Y H:i" }}</div>
+    </div>
+
+    {% regroup results by section as section_list %}
+    {% for group in section_list %}
+      <h2>{{ group.grouper.name }}</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Проект</th>
+            <th>Заочный</th>
+            <th>Очный</th>
+            <th>Итог</th>
+            <th>Место</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in group.list %}
+            <tr>
+              <td>{{ result.project.title }}</td>
+              <td>{{ result.online_score }}</td>
+              <td>{{ result.offline_score }}</td>
+              <td>{{ result.total_score }}</td>
+              <td>{{ result.rank }}</td>
+              <td>
+                {% if result.is_winner %}
+                  Победитель
+                {% elif result.is_prize %}
+                  Призер
+                {% else %}
+                  Участник
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">Нет результатов.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+
+    <div class="signature">
+      <div>Председатель жюри: ____________________</div>
+      <div>Секретарь: ____________________</div>
+    </div>
+  </body>
+</html>

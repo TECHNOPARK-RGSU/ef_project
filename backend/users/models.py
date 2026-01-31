@@ -1,3 +1,4 @@
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from utils.models import BaseModel
 
@@ -59,23 +60,18 @@ class Role(BaseModel):
         ordering = ["name"]
 
 
-class User(BaseModel):
+class User(AbstractUser, BaseModel):
     """Пользователь системы (участник, руководитель, эксперт, организатор)."""
 
-    last_name = models.CharField(max_length=255, verbose_name="Фамилия")
-    first_name = models.CharField(max_length=255, verbose_name="Имя")
-    middle_name = models.CharField(
-        max_length=255,
-        verbose_name="Отчество",
-        blank=True,
-    )
+    username = None
     email = models.EmailField(
         unique=True,
         verbose_name="E-mail",
     )
-    password = models.CharField(
+    middle_name = models.CharField(
         max_length=255,
-        verbose_name="Пароль (хэш)",
+        verbose_name="Отчество",
+        blank=True,
     )
     phone = models.CharField(
         max_length=50,
@@ -108,6 +104,11 @@ class User(BaseModel):
         related_name="users",
         verbose_name="Роль",
     )
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
+    objects = UserManager()
 
     class Meta:
         verbose_name = "Пользователь"
