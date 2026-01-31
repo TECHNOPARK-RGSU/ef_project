@@ -9,9 +9,12 @@ docker compose build
 docker compose up
 ```
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- MinIO: http://localhost:9000 (console: http://localhost:9001)
+- Frontend: http://localhost:26110
+- Backend API: http://localhost:26111
+- MinIO: http://localhost:26112
+- Postgres: localhost:26113 (внешний, уже запущен)
+
+Примечание: консоль MinIO не публикуется наружу (только API на 26112).
 
 ### Демоданные
 
@@ -25,7 +28,7 @@ docker compose exec backend /app/.venv/bin/python manage.py seed_demo
 Для ручного получения:
 
 ```bash
-curl -X POST http://localhost:8000/api/auth/token/ \\
+curl -X POST http://localhost:26111/api/auth/token/ \\
   -H "Content-Type: application/json" \\
   -d '{"username":"organizer@example.com","password":"password123"}'
 ```
@@ -33,12 +36,12 @@ curl -X POST http://localhost:8000/api/auth/token/ \\
 ### Результаты
 
 ```bash
-curl -X POST http://localhost:8000/api/conf/conferences/1/calculate_results/
-curl -X POST http://localhost:8000/api/conf/conferences/1/publish_results/
-curl -X GET  http://localhost:8000/api/conf/conferences/1/export_results/
-curl -X GET  http://localhost:8000/api/conf/conferences/1/export_results_excel/
-curl -X GET  http://localhost:8000/api/conf/conferences/1/print_protocol/
-curl -X POST http://localhost:8000/api/conf/conferences/1/assign_projects/ \\
+curl -X POST http://localhost:26111/api/conf/conferences/1/calculate_results/
+curl -X POST http://localhost:26111/api/conf/conferences/1/publish_results/
+curl -X GET  http://localhost:26111/api/conf/conferences/1/export_results/
+curl -X GET  http://localhost:26111/api/conf/conferences/1/export_results_excel/
+curl -X GET  http://localhost:26111/api/conf/conferences/1/print_protocol/
+curl -X POST http://localhost:26111/api/conf/conferences/1/assign_projects/ \\
   -H "Content-Type: application/json" \\
   -d '{"stage":"online","per_expert":3}'
 ```

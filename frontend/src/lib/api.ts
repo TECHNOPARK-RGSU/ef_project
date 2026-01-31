@@ -6,7 +6,7 @@ export const API_BASE_URL = (() => {
 
   const host = window.location.hostname;
   const protocol = window.location.protocol;
-  return `${protocol}//${host}:8000`;
+  return `${protocol}//${host}:26111`;
 })();
 
 export const toList = <T,>(data: unknown): T[] => {
