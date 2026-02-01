@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
 import { getAuthToken, setAuthToken } from "@/lib/auth";
 import { useState } from "react";
-import { Link } from "wouter";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -94,9 +93,7 @@ export function LoginPage() {
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>Организатор: organizer@example.com</p>
             <p>Пароль: password123</p>
-            <Button variant="secondary" asChild>
-              <Link href="/conferences">Перейти без входа</Link>
-            </Button>
+            <p>Вход обязателен для доступа к разделам.</p>
           </CardContent>
         </Card>
       </div>

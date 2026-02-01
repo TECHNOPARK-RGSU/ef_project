@@ -61,7 +61,7 @@ export function CatalogsPage() {
       fetchList<ParticipationStage>("/api/conf/participation-stages/", controller.signal),
       fetchList<Place>("/api/conf/places/", controller.signal),
       fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal),
-      fetchList<EducationalOrganization>("/api/users/educational_organizations/", controller.signal),
+      fetchList<EducationalOrganization>("/api/users/educational-organizations/", controller.signal),
     ]).then(results => {
       if (controller.signal.aborted) return;
       if (results[0].status === "fulfilled") setCategories(results[0].value);
@@ -416,8 +416,8 @@ export function CatalogsPage() {
       return;
     }
     const endpoint = orgEditingId
-      ? `/api/users/educational_organizations/${orgEditingId}/`
-      : "/api/users/educational_organizations/";
+      ? `/api/users/educational-organizations/${orgEditingId}/`
+      : "/api/users/educational-organizations/";
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: orgEditingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
@@ -462,7 +462,7 @@ export function CatalogsPage() {
       setOrgMessage("Нужен токен организатора.");
       return;
     }
-    const response = await fetch(`${API_BASE_URL}/api/users/educational_organizations/${id}/`, {
+    const response = await fetch(`${API_BASE_URL}/api/users/educational-organizations/${id}/`, {
       method: "DELETE",
       headers: { Authorization: `Token ${token}` },
     });
