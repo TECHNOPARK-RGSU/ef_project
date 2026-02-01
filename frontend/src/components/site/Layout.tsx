@@ -36,30 +36,34 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
               <p className="text-lg font-semibold">EF Platform</p>
             </div>
           </Link>
-          <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground md:flex">
-            {navItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {token ? (
+            <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground md:flex">
+              {navItems.map(item => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="transition-colors hover:text-foreground"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
           <div className="flex items-center gap-3">
             {token ? (
-              <Button variant="outline" onClick={handleLogout}>
-                Выйти
-              </Button>
+              <>
+                <Button variant="outline" onClick={handleLogout}>
+                  Выйти
+                </Button>
+                <Button asChild>
+                  <Link href="/conferences">Создать конференцию</Link>
+                </Button>
+              </>
             ) : (
               <Button variant="outline" asChild>
                 <Link href="/login">Войти</Link>
               </Button>
             )}
-            <Button asChild>
-              <Link href="/conferences">Создать конференцию</Link>
-            </Button>
           </div>
         </div>
       </header>
