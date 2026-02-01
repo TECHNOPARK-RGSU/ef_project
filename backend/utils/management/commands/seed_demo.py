@@ -1,4 +1,7 @@
+from decimal import Decimal
 from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.db.models import Avg
 from django.utils import timezone
 
 from conf.models import (
@@ -12,6 +15,10 @@ from conf.models import (
     Section,
     EvaluationCriterion,
     ProjectScore,
+    Comment,
+    ProjectResult,
+    ExpertAssignment,
+    ExpertAssignmentItem,
 )
 from users.models import EducationalOrganization, Role, User
 from rest_framework.authtoken.models import Token
@@ -33,6 +40,11 @@ class Command(BaseCommand):
             city="Москва",
             defaults={"short_name": "РГСУ", "address": "ул. Вильгельма Пика, 4"},
         )
+        org2, _ = EducationalOrganization.objects.get_or_create(
+            name="МГТУ",
+            city="Москва",
+            defaults={"short_name": "МГТУ", "address": "2-я Бауманская, 5"},
+        )
 
         organizer = self._get_or_create_user(
             email="organizer@example.com",
@@ -48,6 +60,13 @@ class Command(BaseCommand):
             role=expert_role,
             educational_organization=org,
         )
+        expert2 = self._get_or_create_user(
+            email="expert2@example.com",
+            first_name="Екатерина",
+            last_name="Эксперт",
+            role=expert_role,
+            educational_organization=org2,
+        )
         participant = self._get_or_create_user(
             email="participant@example.com",
             first_name="Мария",
@@ -55,21 +74,21 @@ class Command(BaseCommand):
             role=student_role,
             educational_organization=org,
         )
-        self._get_or_create_user(
+        participant2 = self._get_or_create_user(
             email="student2@example.com",
             first_name="Сергей",
             last_name="Ученик2",
             role=student2_role,
             educational_organization=org,
         )
-        self._get_or_create_user(
+        participant3 = self._get_or_create_user(
             email="student3@example.com",
             first_name="Ольга",
             last_name="Ученик3",
             role=student3_role,
-            educational_organization=org,
+            educational_organization=org2,
         )
-        self._get_or_create_user(
+        tutor = self._get_or_create_user(
             email="tutor@example.com",
             first_name="Ирина",
             last_name="Наставник",
@@ -79,6 +98,7 @@ class Command(BaseCommand):
 
         age_14_18 = self._get_or_create_age("14-18 лет", 14, 18)
         age_16_22 = self._get_or_create_age("16-22 года", 16, 22)
+        age_18_25 = self._get_or_create_age("18-25 лет", 18, 25)
 
         status_new = self._get_or_create_status("Новый", "new")
         status_review = self._get_or_create_status("На доработку", "rework")
@@ -92,8 +112,13 @@ class Command(BaseCommand):
             name="Главный корпус",
             address="Москва, ул. Вильгельма Пика, 4",
         )
+        place2, _ = Place.objects.get_or_create(
+            name="Корпус Б",
+            address="Москва, 2-я Бауманская, 5",
+        )
         pres_oral = self._get_or_create_presentation_type("Очный доклад", "oral", place)
-        self._get_or_create_presentation_type("Стендовый", "poster", place)
+        pres_poster = self._get_or_create_presentation_type("Стендовый", "poster", place2)
+        pres_online = self._get_or_create_presentation_type("Онлайн-доклад", "online", place)
 
         conference, _ = Conference.objects.get_or_create(
             title="Межвузовские дни науки",
@@ -107,6 +132,30 @@ class Command(BaseCommand):
             },
         )
         conference.organizers.add(organizer)
+        conference_online, _ = Conference.objects.get_or_create(
+            title="Онлайн-конференция исследователей",
+            defaults={
+                "description": "Заочный этап с защитой в видео-формате.",
+                "start_date": timezone.now().date(),
+                "end_date": timezone.now().date(),
+                "location": "Онлайн",
+                "format": "online",
+                "is_online": True,
+            },
+        )
+        conference_online.organizers.add(organizer)
+        conference_offline, _ = Conference.objects.get_or_create(
+            title="Очная инженерная сессия",
+            defaults={
+                "description": "Очный этап с защитой в аудиториях.",
+                "start_date": timezone.now().date(),
+                "end_date": timezone.now().date(),
+                "location": "Москва, МГТУ",
+                "format": "offline",
+                "is_online": False,
+            },
+        )
+        conference_offline.organizers.add(organizer)
 
         section_science, _ = Section.objects.get_or_create(
             name="Научные исследования",
@@ -123,6 +172,16 @@ class Command(BaseCommand):
             conference=conference,
             category=age_14_18,
         )
+        section_online, _ = Section.objects.get_or_create(
+            name="Цифровые решения",
+            conference=conference_online,
+            category=age_18_25,
+        )
+        section_offline, _ = Section.objects.get_or_create(
+            name="Прикладная инженерия",
+            conference=conference_offline,
+            category=age_16_22,
+        )
 
         project, _ = Project.objects.get_or_create(
             title="Энергоэффективный кампус",
@@ -136,6 +195,44 @@ class Command(BaseCommand):
                 "additional_info": "Демо-проект для учебной платформы.",
             },
         )
+        project2, _ = Project.objects.get_or_create(
+            title="Умная навигация по кампусу",
+            leader=participant2,
+            tutor=tutor,
+            section=section_science,
+            status=status_review,
+            stage=stage_qual,
+            presentation_type=pres_poster,
+            defaults={
+                "description": "Прототип навигации с AR-метками.",
+                "additional_info": "Нужен отзыв эксперта по UX.",
+            },
+        )
+        project3, _ = Project.objects.get_or_create(
+            title="Онлайн-платформа профориентации",
+            leader=participant3,
+            section=section_online,
+            status=status_new,
+            stage=stage_qual,
+            presentation_type=pres_online,
+            defaults={
+                "description": "Сервис для профориентации школьников.",
+                "additional_info": "Демо-версия доступна по ссылке.",
+            },
+        )
+        project4, _ = Project.objects.get_or_create(
+            title="Робот-ассистент для лабораторий",
+            leader=participant,
+            tutor=tutor,
+            section=section_offline,
+            status=status_review,
+            stage=stage_qual,
+            presentation_type=pres_oral,
+            defaults={
+                "description": "Ассистент для контроля лабораторных измерений.",
+                "additional_info": "Требуется очная защита.",
+            },
+        )
 
         criterion_online, _ = EvaluationCriterion.objects.get_or_create(
             conference=conference,
@@ -146,6 +243,30 @@ class Command(BaseCommand):
         criterion_offline, _ = EvaluationCriterion.objects.get_or_create(
             conference=conference,
             name="Качество доклада",
+            stage="offline",
+            defaults={"max_score": 10},
+        )
+        criterion_online2, _ = EvaluationCriterion.objects.get_or_create(
+            conference=conference,
+            name="Новизна решения",
+            stage="online",
+            defaults={"max_score": 10},
+        )
+        criterion_offline2, _ = EvaluationCriterion.objects.get_or_create(
+            conference=conference,
+            name="Качество презентации",
+            stage="offline",
+            defaults={"max_score": 10},
+        )
+        EvaluationCriterion.objects.get_or_create(
+            conference=conference_online,
+            name="Полнота исследования",
+            stage="online",
+            defaults={"max_score": 10},
+        )
+        EvaluationCriterion.objects.get_or_create(
+            conference=conference_offline,
+            name="Практическая ценность",
             stage="offline",
             defaults={"max_score": 10},
         )
@@ -162,6 +283,56 @@ class Command(BaseCommand):
             evaluator=expert,
             defaults={"score": 9},
         )
+        ProjectScore.objects.get_or_create(
+            project=project,
+            criterion=criterion_online2,
+            evaluator=expert,
+            defaults={"score": 7},
+        )
+        ProjectScore.objects.get_or_create(
+            project=project2,
+            criterion=criterion_online,
+            evaluator=expert2,
+            defaults={"score": 6},
+        )
+        ProjectScore.objects.get_or_create(
+            project=project2,
+            criterion=criterion_offline,
+            evaluator=expert2,
+            defaults={"score": 7},
+        )
+        ProjectScore.objects.get_or_create(
+            project=project3,
+            criterion=criterion_online,
+            evaluator=expert,
+            defaults={"score": 8},
+        )
+        ProjectScore.objects.get_or_create(
+            project=project4,
+            criterion=criterion_offline,
+            evaluator=expert,
+            defaults={"score": 9},
+        )
+
+        Comment.objects.get_or_create(
+            project=project,
+            author=expert,
+            defaults={"text": "Усилить обоснование экономического эффекта."},
+        )
+        Comment.objects.get_or_create(
+            project=project2,
+            author=tutor,
+            defaults={"text": "Добавить демонстрационное видео в презентацию."},
+        )
+
+        self._seed_assignments(conference, "online", [expert, expert2], [project, project2])
+        self._seed_assignments(conference, "offline", [expert], [project, project2])
+        self._seed_assignments(conference_online, "online", [expert2], [project3])
+        self._seed_assignments(conference_offline, "offline", [expert], [project4])
+
+        self._recalculate_results(conference)
+        self._recalculate_results(conference_online)
+        self._recalculate_results(conference_offline)
 
         token, _ = Token.objects.get_or_create(user=organizer)
         self.stdout.write(self.style.SUCCESS(f"Organizer token: {token.key}"))
@@ -203,5 +374,77 @@ class Command(BaseCommand):
         return stage
 
     def _get_or_create_presentation_type(self, name: str, code: str, place: Place) -> PresentationType:
-        pres, _ = PresentationType.objects.get_or_create(name=name, code=code, place=place)
+        pres, created = PresentationType.objects.get_or_create(
+            code=code,
+            defaults={"name": name, "place": place},
+        )
+        if not created:
+            updates = []
+            if pres.name != name:
+                pres.name = name
+                updates.append("name")
+            if pres.place_id != place.id:
+                pres.place = place
+                updates.append("place")
+            if updates:
+                pres.save(update_fields=updates)
         return pres
+
+    def _seed_assignments(self, conference, stage: str, experts: list[User], projects: list[Project]):
+        if not experts or not projects:
+            return
+        with transaction.atomic():
+            for expert in experts:
+                assignment, _ = ExpertAssignment.objects.get_or_create(
+                    conference=conference,
+                    expert=expert,
+                    stage=stage,
+                    defaults={"max_projects": len(projects)},
+                )
+                for project in projects:
+                    ExpertAssignmentItem.objects.get_or_create(
+                        assignment=assignment,
+                        project=project,
+                    )
+
+    def _recalculate_results(self, conference: Conference):
+        criteria = EvaluationCriterion.objects.filter(conference=conference)
+        projects = Project.objects.filter(section__conference=conference, is_archived=False)
+        ProjectResult.objects.filter(conference=conference).delete()
+        results = []
+        for project in projects:
+            online_sum = Decimal("0")
+            offline_sum = Decimal("0")
+            for criterion in criteria:
+                avg_score = (
+                    ProjectScore.objects.filter(project=project, criterion=criterion)
+                    .aggregate(avg=Avg("score"))
+                    .get("avg")
+                ) or Decimal("0")
+                if criterion.stage == "online":
+                    online_sum += Decimal(avg_score)
+                else:
+                    offline_sum += Decimal(avg_score)
+            total = online_sum + offline_sum
+            results.append(
+                ProjectResult(
+                    conference=conference,
+                    section=project.section,
+                    project=project,
+                    online_score=online_sum,
+                    offline_score=offline_sum,
+                    total_score=total,
+                )
+            )
+        ProjectResult.objects.bulk_create(results)
+        for section in Section.objects.filter(conference=conference):
+            section_results = list(
+                ProjectResult.objects.filter(section=section).order_by("-total_score", "project__id")
+            )
+            for idx, result in enumerate(section_results, start=1):
+                result.rank = idx
+                result.is_winner = idx <= conference.winners_count
+                result.is_prize = idx > conference.winners_count and idx <= (
+                    conference.winners_count + conference.prizes_count
+                )
+            ProjectResult.objects.bulk_update(section_results, ["rank", "is_winner", "is_prize"])

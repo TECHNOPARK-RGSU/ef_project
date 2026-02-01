@@ -118,8 +118,8 @@ export function CatalogsPage() {
     setCategoryEditingId(item.id);
     setCategoryForm({
       name: item.name,
-      minAge: String(item.min_age),
-      maxAge: String(item.max_age),
+      minAge: item.min_age === null ? "" : String(item.min_age),
+      maxAge: item.max_age === null ? "" : String(item.max_age),
     });
   };
 
