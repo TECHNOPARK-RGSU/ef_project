@@ -11,10 +11,22 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SectionsPage } from "@/pages/SectionsPage";
 import { UsersPage } from "@/pages/UsersPage";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
+import { getAuthToken } from "@/lib/auth";
 import "./index.css";
 
 export function App() {
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (location === "/login") return;
+    const token = getAuthToken();
+    if (!token) {
+      setLocation("/login");
+    }
+  }, [location, setLocation]);
+
   return (
     <SiteLayout>
       <Switch>

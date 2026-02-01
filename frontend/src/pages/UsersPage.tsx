@@ -27,7 +27,7 @@ export function UsersPage() {
     const controller = new AbortController();
     Promise.allSettled([
       fetchList<Role>("/api/users/roles/", controller.signal),
-      fetchList<EducationalOrganization>("/api/users/educational_organizations/", controller.signal),
+      fetchList<EducationalOrganization>("/api/users/educational-organizations/", controller.signal),
       fetchList<User>("/api/users/users/", controller.signal),
     ]).then(results => {
       if (controller.signal.aborted) return;
