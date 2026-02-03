@@ -389,11 +389,24 @@ class ProjectScoreSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         criterion = attrs.get("criterion", getattr(self.instance, "criterion", None))
+        project = attrs.get("project", getattr(self.instance, "project", None))
         score = attrs.get("score")
-        if criterion and score is not None and score > criterion.max_score:
-            raise serializers.ValidationError(
-                {"score": "Баллы не могут превышать максимум по критерию."}
+        errors = {}
+        if score is not None:
+            if score < 0:
+                errors["score"] = "Баллы не могут быть отрицательными."
+            if criterion and score > criterion.max_score:
+                errors["score"] = "Баллы не могут превышать максимум по критерию."
+
+        if project and criterion:
+            project_conference = (
+                project.section.conference_id if project.section_id else None
             )
+            if project_conference is None or project_conference != criterion.conference_id:
+                errors["criterion_id"] = "Критерий не относится к конференции проекта."
+
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 

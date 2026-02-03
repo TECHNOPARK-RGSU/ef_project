@@ -1,7 +1,5 @@
-from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import Avg
 from django.utils import timezone
 
 from conf.models import (
@@ -16,10 +14,10 @@ from conf.models import (
     EvaluationCriterion,
     ProjectScore,
     Comment,
-    ProjectResult,
     ExpertAssignment,
     ExpertAssignmentItem,
 )
+from conf.services.results import calculate_results_for_conference
 from users.models import EducationalOrganization, Role, User
 from rest_framework.authtoken.models import Token
 
@@ -408,43 +406,4 @@ class Command(BaseCommand):
                     )
 
     def _recalculate_results(self, conference: Conference):
-        criteria = EvaluationCriterion.objects.filter(conference=conference)
-        projects = Project.objects.filter(section__conference=conference, is_archived=False)
-        ProjectResult.objects.filter(conference=conference).delete()
-        results = []
-        for project in projects:
-            online_sum = Decimal("0")
-            offline_sum = Decimal("0")
-            for criterion in criteria:
-                avg_score = (
-                    ProjectScore.objects.filter(project=project, criterion=criterion)
-                    .aggregate(avg=Avg("score"))
-                    .get("avg")
-                ) or Decimal("0")
-                if criterion.stage == "online":
-                    online_sum += Decimal(avg_score)
-                else:
-                    offline_sum += Decimal(avg_score)
-            total = online_sum + offline_sum
-            results.append(
-                ProjectResult(
-                    conference=conference,
-                    section=project.section,
-                    project=project,
-                    online_score=online_sum,
-                    offline_score=offline_sum,
-                    total_score=total,
-                )
-            )
-        ProjectResult.objects.bulk_create(results)
-        for section in Section.objects.filter(conference=conference):
-            section_results = list(
-                ProjectResult.objects.filter(section=section).order_by("-total_score", "project__id")
-            )
-            for idx, result in enumerate(section_results, start=1):
-                result.rank = idx
-                result.is_winner = idx <= conference.winners_count
-                result.is_prize = idx > conference.winners_count and idx <= (
-                    conference.winners_count + conference.prizes_count
-                )
-            ProjectResult.objects.bulk_update(section_results, ["rank", "is_winner", "is_prize"])
+        calculate_results_for_conference(conference)
