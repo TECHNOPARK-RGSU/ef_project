@@ -5,21 +5,20 @@
 ## Переменные окружения
 
 ```
-MINIO_ROOT_USER=change-me
-MINIO_ROOT_PASSWORD=change-me
-MINIO_BUCKET=ef-project
-MINIO_REGION=ru-central
-MINIO_ENDPOINT=http://minio:9000
-MINIO_PUBLIC_URL=https://projectaris.jkproduction.pro:26112
+MINIO_ACCESS_KEY=change-me
+MINIO_SECRET_KEY=change-me
+MINIO_BUCKET=change-me
+MINIO_REGION=us-east-1
+MINIO_ENDPOINT=https://s3.example.com
+MINIO_PUBLIC_URL=https://s3.example.com
 
 AWS_ACCESS_KEY_ID=change-me
 AWS_SECRET_ACCESS_KEY=change-me
-S3_ENDPOINT_URL=http://minio:9000
-S3_BUCKET=ef-project
+S3_ENDPOINT_URL=https://s3.example.com
+S3_BUCKET=change-me
 ```
 
 ## Заметки
 
-- MINIO_ROOT_* — учётные данные администратора MinIO.
-- AWS_* и S3_* понадобятся, когда будем подключать хранилище к backend.
-- Значения примерные, под Dokploy заменим на реальные.
+- MINIO_* — параметры удалённого MinIO.
+- AWS_* и S3_* нужны для совместимых SDK, используем те же ключи.
