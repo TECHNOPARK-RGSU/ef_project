@@ -22,6 +22,7 @@ import {
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference, ProjectStatus, Role, Section } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 
 const toTrackCards = (sections: Section[]) =>
   sections.slice(0, 3).map(section => ({
@@ -114,9 +115,11 @@ export function HomePage() {
             учебного проекта — и ничего лишнего.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button size="lg">Открыть приём заявок</Button>
-            <Button size="lg" variant="outline">
-              Посмотреть демо
+            <Button size="lg" asChild>
+              <Link href="/apply">Открыть приём заявок</Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href="#events">Посмотреть демо</a>
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -159,8 +162,8 @@ export function HomePage() {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="w-full">
-              Перейти к настройкам
+            <Button variant="outline" className="w-full" asChild>
+              <Link href="/conferences">Перейти к настройкам</Link>
             </Button>
           </CardContent>
         </Card>
@@ -178,7 +181,9 @@ export function HomePage() {
             >
               {apiState === "ready" ? "API онлайн" : "Демо данные"}
             </span>
-            <Button variant="outline">Все конференции</Button>
+            <Button variant="outline" asChild>
+              <Link href="/conferences">Все конференции</Link>
+            </Button>
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
@@ -236,10 +241,17 @@ export function HomePage() {
                     <p>Приём заявок открыт до окончания конференции.</p>
                     <p>Можно добавить секции и распределить экспертов.</p>
                   </div>
-                  <Button className="w-full">Открыть карточку</Button>
+                  <Button className="w-full" asChild>
+                    <Link href={`/conferences/${selectedConference.id}`}>Открыть карточку</Link>
+                  </Button>
                 </>
               ) : (
-                <p>Нажмите «Подробнее» у нужного события.</p>
+                <>
+                  <p>Нажмите «Подробнее» у нужного события.</p>
+                  <Button className="w-full" disabled>
+                    Открыть карточку
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>
@@ -258,7 +270,9 @@ export function HomePage() {
             >
               {metaState === "ready" ? "из API" : "демо"}
             </span>
-            <Button variant="outline">Добавить секцию</Button>
+            <Button variant="outline" asChild>
+              <Link href="/sections">Добавить секцию</Link>
+            </Button>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
@@ -276,8 +290,8 @@ export function HomePage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Button variant="secondary" className="w-full">
-                  Открыть секцию
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href="/sections">Открыть секцию</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -375,7 +389,9 @@ export function HomePage() {
                 className="min-h-[120px]"
               />
             </div>
-            <Button className="w-full">Сохранить черновик</Button>
+            <Button className="w-full" asChild>
+              <Link href="/apply">Сохранить черновик</Link>
+            </Button>
           </CardContent>
         </Card>
 

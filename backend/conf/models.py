@@ -412,11 +412,22 @@ class ProjectScore(BaseModel):
         ]
 
     def clean(self):
-        if self.score is not None and self.criterion_id is not None:
-            if self.score > self.criterion.max_score:
-                raise ValidationError(
-                    {"score": "Баллы не могут превышать максимум по критерию."}
-                )
+        errors = {}
+        if self.score is not None:
+            if self.score < 0:
+                errors["score"] = "Баллы не могут быть отрицательными."
+            if self.criterion_id is not None and self.score > self.criterion.max_score:
+                errors["score"] = "Баллы не могут превышать максимум по критерию."
+
+        if self.project_id and self.criterion_id:
+            project_conference = (
+                self.project.section.conference_id if self.project.section_id else None
+            )
+            if project_conference is None or project_conference != self.criterion.conference_id:
+                errors["criterion"] = "Критерий не относится к конференции проекта."
+
+        if errors:
+            raise ValidationError(errors)
 
 
 class ProjectResult(BaseModel):

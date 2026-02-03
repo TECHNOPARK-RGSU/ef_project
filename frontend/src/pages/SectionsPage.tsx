@@ -7,7 +7,7 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import { FALLBACK_TRACKS } from "@/lib/demo";
 import type { Conference, Section } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export function SectionsPage() {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -18,6 +18,7 @@ export function SectionsPage() {
   const [form, setForm] = useState({ name: "", conferenceId: "", categoryId: "" });
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,6 +55,10 @@ export function SectionsPage() {
   }, [sections]);
 
   const canSubmit = form.name.trim() && form.conferenceId && form.categoryId;
+
+  const handleCreateClick = () => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const submitSection = async () => {
     setSubmitState("saving");
@@ -132,97 +137,99 @@ export function SectionsPage() {
           <span className={`rounded-full px-3 py-1 ${state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}>
             {state === "ready" ? "из API" : "демо"}
           </span>
-          <Button>Добавить</Button>
+          <Button onClick={handleCreateClick}>Добавить</Button>
         </div>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование секции" : "Новая секция"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="section-name">Название</Label>
-              <Input
-                id="section-name"
-                value={form.name}
-                onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
-                placeholder="Название секции"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Конференция</Label>
-              <Select
-                value={form.conferenceId || undefined}
-                onValueChange={value => setForm(current => ({ ...current, conferenceId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите конференцию" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conferences.length ? (
-                    conferences.map(conf => (
-                      <SelectItem key={conf.id} value={String(conf.id)}>
-                        {conf.title}
+      <div ref={formRef}>
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {editingId ? "Редактирование секции" : "Новая секция"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="section-name">Название</Label>
+                <Input
+                  id="section-name"
+                  value={form.name}
+                  onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
+                  placeholder="Название секции"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Конференция</Label>
+                <Select
+                  value={form.conferenceId || undefined}
+                  onValueChange={value => setForm(current => ({ ...current, conferenceId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите конференцию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {conferences.length ? (
+                      conferences.map(conf => (
+                        <SelectItem key={conf.id} value={String(conf.id)}>
+                          {conf.title}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет конференций
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет конференций
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Возрастная категория</Label>
-              <Select
-                value={form.categoryId || undefined}
-                onValueChange={value => setForm(current => ({ ...current, categoryId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Категория" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.length ? (
-                    categories.map(category => (
-                      <SelectItem key={category.id} value={String(category.id)}>
-                        {category.name}
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Возрастная категория</Label>
+                <Select
+                  value={form.categoryId || undefined}
+                  onValueChange={value => setForm(current => ({ ...current, categoryId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Категория" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.length ? (
+                      categories.map(category => (
+                        <SelectItem key={category.id} value={String(category.id)}>
+                          {category.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет категорий
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет категорий
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-          {submitMessage ? <p className="text-xs text-muted-foreground">{submitMessage}</p> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              className="w-full md:w-auto"
-              disabled={!canSubmit || submitState === "saving"}
-              onClick={submitSection}
-            >
-              {submitState === "saving"
-                ? "Сохраняем…"
-                : editingId
-                  ? "Сохранить"
-                  : "Создать секцию"}
-            </Button>
-            {editingId ? (
-              <Button variant="outline" onClick={cancelEdit}>
-                Отмена
+            {submitMessage ? <p className="text-xs text-muted-foreground">{submitMessage}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="w-full md:w-auto"
+                disabled={!canSubmit || submitState === "saving"}
+                onClick={submitSection}
+              >
+                {submitState === "saving"
+                  ? "Сохраняем…"
+                  : editingId
+                    ? "Сохранить"
+                    : "Создать секцию"}
               </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+              {editingId ? (
+                <Button variant="outline" onClick={cancelEdit}>
+                  Отмена
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         {state === "loading" && !sections.length ? (
