@@ -11,7 +11,7 @@ docker compose up
 
 - Frontend: http://localhost:26110
 - Backend API: http://localhost:26111 (локально), https://projectaris.jkproduction.pro:8000 (prod)
-- MinIO: внешний (https://s3.example.com)
+- MinIO: внешний (указывается через переменные окружения)
 - Postgres: localhost:26113 (внешний, уже запущен)
 
 ### Демоданные
