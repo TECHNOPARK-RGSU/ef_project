@@ -40,8 +40,13 @@ export function UsersPage() {
 
   const submitUser = async () => {
     setMessage(null);
+    const isCreate = !editingId;
     if (!form.lastName.trim() || !form.firstName.trim() || !form.roleId) {
       setMessage("Заполните фамилию, имя и роль.");
+      return;
+    }
+    if (isCreate && !form.email.trim()) {
+      setMessage("Для создания пользователя нужен email.");
       return;
     }
     const token = getAuthToken();
@@ -50,20 +55,36 @@ export function UsersPage() {
       return;
     }
     const endpoint = editingId ? `/api/users/users/${editingId}/` : "/api/users/users/";
+    const payload: Record<string, unknown> = {
+      last_name: form.lastName,
+      first_name: form.firstName,
+      role_id: Number(form.roleId),
+      educational_organization_id: form.orgId === "none" ? null : Number(form.orgId),
+    };
+    if (form.email.trim()) payload.email = form.email.trim();
+    if (form.password.trim()) payload.password = form.password.trim();
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-      body: JSON.stringify({
-        last_name: form.lastName,
-        first_name: form.firstName,
-        email: form.email || null,
-        password: form.password || undefined,
-        role_id: Number(form.roleId),
-        educational_organization_id: form.orgId === "none" ? null : Number(form.orgId),
-      }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      setMessage("Не удалось сохранить пользователя.");
+      let details = "Не удалось сохранить пользователя.";
+      try {
+        const data = (await response.json()) as Record<string, string[] | string>;
+        const errors = Object.values(data)
+          .flatMap(value => (Array.isArray(value) ? value : [value]))
+          .filter(Boolean)
+          .join(" ");
+        if (errors) details = errors;
+      } catch {
+        // ignore parsing errors
+      }
+      if (response.status === 403) {
+        details = "Недостаточно прав для изменения пользователей.";
+      }
+      setMessage(details);
       return;
     }
     const created = (await response.json()) as User;
