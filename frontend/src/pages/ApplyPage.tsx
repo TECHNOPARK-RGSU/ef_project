@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
-import { FALLBACK_ROLES, FALLBACK_STATUSES } from "@/lib/demo";
 import type {
   ParticipationStage,
   PresentationType,
@@ -71,14 +70,8 @@ export function ApplyPage() {
     return () => controller.abort();
   }, []);
 
-  const visibleRoles = useMemo(
-    () => (roles.length ? roles.map(role => `${role.name} — ${role.code}`) : FALLBACK_ROLES),
-    [roles],
-  );
-  const visibleStatuses = useMemo(
-    () => (statuses.length ? statuses.slice(0, 4).map(status => status.name) : FALLBACK_STATUSES),
-    [statuses],
-  );
+  const visibleRoles = useMemo(() => roles.map(role => `${role.name} — ${role.code}`), [roles]);
+  const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(status => status.name), [statuses]);
 
   const canSubmit =
     form.title.trim() &&
@@ -525,30 +518,40 @@ export function ApplyPage() {
         <Card className="border-border/70 bg-card/80">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Статусы проекта</CardTitle>
-            <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}>
-              {state === "ready" ? "из API" : "демо"}
+            <span
+              className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {state === "ready" ? "данные загружены" : "нет данных"}
             </span>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {visibleStatuses.map(status => (
-              <div key={status} className="flex items-center justify-between">
-                <span>{status}</span>
-                <span className="h-2 w-12 rounded-full bg-primary/30" />
-              </div>
-            ))}
+            {visibleStatuses.length ? (
+              visibleStatuses.map(status => (
+                <div key={status} className="flex items-center justify-between">
+                  <span>{status}</span>
+                  <span className="h-2 w-12 rounded-full bg-primary/30" />
+                </div>
+              ))
+            ) : (
+              <p>Статусов пока нет.</p>
+            )}
           </CardContent>
         </Card>
         <Card className="border-border/70 bg-card/80">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Роли</CardTitle>
-            <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}>
-              {state === "ready" ? "из API" : "демо"}
+            <span
+              className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {state === "ready" ? "данные загружены" : "нет данных"}
             </span>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {visibleRoles.map(role => (
-              <p key={role}>{role}</p>
-            ))}
+            {visibleRoles.length ? visibleRoles.map(role => <p key={role}>{role}</p>) : <p>Ролей пока нет.</p>}
           </CardContent>
         </Card>
       </div>

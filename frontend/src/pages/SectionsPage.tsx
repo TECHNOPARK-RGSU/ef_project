@@ -5,9 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
-import { FALLBACK_TRACKS } from "@/lib/demo";
 import type { Conference, Section } from "@/lib/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function SectionsPage() {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -42,17 +41,6 @@ export function SectionsPage() {
     load();
     return () => controller.abort();
   }, []);
-
-  const visibleSections = useMemo(() => {
-    if (sections.length) {
-      return sections.map(section => ({
-        name: section.name,
-        age: section.category?.name ?? "Категория не указана",
-        format: section.conference?.title ?? "Конференция не указана",
-      }));
-    }
-    return FALLBACK_TRACKS;
-  }, [sections]);
 
   const canSubmit = form.name.trim() && form.conferenceId && form.categoryId;
 
@@ -134,8 +122,12 @@ export function SectionsPage() {
           <p className="text-sm text-muted-foreground">Направления и возрастные категории для конференций.</p>
         </div>
         <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          <span className={`rounded-full px-3 py-1 ${state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}>
-            {state === "ready" ? "из API" : "демо"}
+          <span
+            className={`rounded-full px-3 py-1 ${
+              state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {state === "ready" ? "данные загружены" : "нет данных"}
           </span>
           <Button onClick={handleCreateClick}>Добавить</Button>
         </div>
@@ -237,39 +229,35 @@ export function SectionsPage() {
             <CardContent className="p-6 text-sm text-muted-foreground">Загружаем секции…</CardContent>
           </Card>
         ) : (
-          sections.length
-            ? sections.map(section => (
-                <Card key={section.id} className="border-border/70 bg-card/80">
-                  <CardHeader className="space-y-2">
-                    <CardTitle className="text-lg">{section.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {section.category?.name || "Категория не указана"}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground space-y-2">
-                    <p>{section.conference?.title || "Конференция не указана"}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => startEdit(section)}>
-                        Редактировать
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => deleteSection(section.id)}>
-                        Удалить
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            : visibleSections.map(section => (
-                <Card key={section.name} className="border-border/70 bg-card/80">
-                  <CardHeader className="space-y-2">
-                    <CardTitle className="text-lg">{section.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{section.age}</p>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
-                    <p>{section.format}</p>
-                  </CardContent>
-                </Card>
-              ))
+          sections.length ? (
+            sections.map(section => (
+              <Card key={section.id} className="border-border/70 bg-card/80">
+                <CardHeader className="space-y-2">
+                  <CardTitle className="text-lg">{section.name}</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {section.category?.name || "Категория не указана"}
+                  </p>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-2">
+                  <p>{section.conference?.title || "Конференция не указана"}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => startEdit(section)}>
+                      Редактировать
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => deleteSection(section.id)}>
+                      Удалить
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="border-border/70 bg-card/80">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Секций пока нет. Создайте первую запись.
+              </CardContent>
+            </Card>
+          )
         )}
       </div>
     </section>

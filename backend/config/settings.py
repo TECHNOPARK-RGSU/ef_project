@@ -164,7 +164,7 @@ if MINIO_ENABLED:
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_USE_SSL = MINIO_ENDPOINT.startswith("https")
-    AWS_S3_VERIFY = False
+    AWS_S3_VERIFY = os.getenv("MINIO_VERIFY_SSL", "1") == "1"
     if MINIO_PUBLIC_URL:
         parsed = urlparse(MINIO_PUBLIC_URL)
         domain = parsed.netloc or MINIO_PUBLIC_URL

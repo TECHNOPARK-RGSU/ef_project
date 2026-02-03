@@ -11,14 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchList } from "@/lib/api";
-import {
-  FALLBACK_CONFERENCES,
-  FALLBACK_ROLES,
-  FALLBACK_STATUSES,
-  FALLBACK_TRACKS,
-  FEATURES,
-  STEPS,
-} from "@/lib/demo";
+import { FEATURES, STEPS } from "@/lib/content";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference, ProjectStatus, Role, Section } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
@@ -77,28 +70,22 @@ export function HomePage() {
     return () => controller.abort();
   }, []);
 
-  const visibleConferences = useMemo(
-    () => (conferences.length ? conferences : FALLBACK_CONFERENCES),
-    [conferences],
-  );
-  const visibleTracks = useMemo(
-    () => (sections.length ? toTrackCards(sections) : FALLBACK_TRACKS),
-    [sections],
-  );
-  const visibleStatuses = useMemo(
-    () => (statuses.length ? statuses.slice(0, 4).map(item => item.name) : FALLBACK_STATUSES),
-    [statuses],
-  );
-  const visibleRoles = useMemo(
-    () => (roles.length ? roles.map(role => `${role.name} — ${role.code}`) : FALLBACK_ROLES),
-    [roles],
-  );
+  const visibleConferences = useMemo(() => conferences, [conferences]);
+  const visibleTracks = useMemo(() => toTrackCards(sections), [sections]);
+  const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(item => item.name), [statuses]);
+  const visibleRoles = useMemo(() => roles.map(role => `${role.name} — ${role.code}`), [roles]);
 
   useEffect(() => {
     if (!selectedConference && visibleConferences.length) {
       setSelectedConference(visibleConferences[0]);
     }
   }, [selectedConference, visibleConferences]);
+
+  const stats = [
+    { value: String(sections.length), label: "Секций" },
+    { value: String(conferences.length), label: "Конференций" },
+    { value: String(statuses.length), label: "Статусов проекта" },
+  ];
 
   return (
     <>
@@ -119,19 +106,15 @@ export function HomePage() {
               <Link href="/apply">Открыть приём заявок</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <a href="#events">Посмотреть демо</a>
+              <a href="#events">К событиям</a>
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {[
-              ["24", "Секции за учебный год"],
-              ["3", "Сценария участия"],
-              ["7", "Статусов проекта"],
-            ].map(([value, label]) => (
-              <Card key={value} className="border-border/60 bg-card/80">
+            {stats.map(item => (
+              <Card key={item.label} className="border-border/60 bg-card/80">
                 <CardContent className="space-y-1 p-4">
-                  <p className="text-2xl font-semibold">{value}</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+                  <p className="text-2xl font-semibold">{item.value}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{item.label}</p>
                 </CardContent>
               </Card>
             ))}
@@ -179,7 +162,7 @@ export function HomePage() {
             <span
               className={`rounded-full px-3 py-1 ${apiState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}
             >
-              {apiState === "ready" ? "API онлайн" : "Демо данные"}
+              {apiState === "ready" ? "данные загружены" : "нет данных"}
             </span>
             <Button variant="outline" asChild>
               <Link href="/conferences">Все конференции</Link>
@@ -194,7 +177,7 @@ export function HomePage() {
                   Загружаем список конференций…
                 </CardContent>
               </Card>
-            ) : (
+            ) : visibleConferences.length ? (
               visibleConferences.map((conf, index) => (
                 <Card
                   key={conf.id}
@@ -218,6 +201,12 @@ export function HomePage() {
                   </CardContent>
                 </Card>
               ))
+            ) : (
+              <Card className="border-border/70 bg-card/80">
+                <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
+                  Конференции пока не созданы.
+                </CardContent>
+              </Card>
             )}
           </div>
           <Card className="border-border/70 bg-card/85">
@@ -268,7 +257,7 @@ export function HomePage() {
             <span
               className={`rounded-full px-3 py-1 ${metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}
             >
-              {metaState === "ready" ? "из API" : "демо"}
+              {metaState === "ready" ? "данные загружены" : "нет данных"}
             </span>
             <Button variant="outline" asChild>
               <Link href="/sections">Добавить секцию</Link>
@@ -276,26 +265,34 @@ export function HomePage() {
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          {visibleTracks.map((track, index) => (
-            <Card
-              key={track.name}
-              className="border-border/70 bg-card/80 animate-rise"
-              style={{ animationDelay: `${index * 120}ms` }}
-            >
-              <CardHeader className="space-y-3">
-                <CardTitle className="text-lg">{track.name}</CardTitle>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>{track.age}</p>
-                  <p>{track.format}</p>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button variant="secondary" className="w-full" asChild>
-                  <Link href="/sections">Открыть секцию</Link>
-                </Button>
+          {visibleTracks.length ? (
+            visibleTracks.map((track, index) => (
+              <Card
+                key={track.name}
+                className="border-border/70 bg-card/80 animate-rise"
+                style={{ animationDelay: `${index * 120}ms` }}
+              >
+                <CardHeader className="space-y-3">
+                  <CardTitle className="text-lg">{track.name}</CardTitle>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>{track.age}</p>
+                    <p>{track.format}</p>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="secondary" className="w-full" asChild>
+                    <Link href="/sections">Открыть секцию</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="border-border/70 bg-card/80">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Секций пока нет. Добавьте направления в разделе «Секции».
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
       </section>
 
@@ -404,16 +401,20 @@ export function HomePage() {
                   metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
                 }`}
               >
-                {metaState === "ready" ? "из API" : "демо"}
+                {metaState === "ready" ? "данные загружены" : "нет данных"}
               </span>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {visibleStatuses.map(status => (
-                <div key={status} className="flex items-center justify-between">
-                  <span>{status}</span>
-                  <span className="h-2 w-12 rounded-full bg-primary/30" />
-                </div>
-              ))}
+              {visibleStatuses.length ? (
+                visibleStatuses.map(status => (
+                  <div key={status} className="flex items-center justify-between">
+                    <span>{status}</span>
+                    <span className="h-2 w-12 rounded-full bg-primary/30" />
+                  </div>
+                ))
+              ) : (
+                <p>Статусов пока нет.</p>
+              )}
             </CardContent>
           </Card>
           <Card className="border-border/70 bg-card/80">
@@ -424,13 +425,11 @@ export function HomePage() {
                   metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
                 }`}
               >
-                {metaState === "ready" ? "из API" : "демо"}
+                {metaState === "ready" ? "данные загружены" : "нет данных"}
               </span>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {visibleRoles.map(role => (
-                <p key={role}>{role}</p>
-              ))}
+              {visibleRoles.length ? visibleRoles.map(role => <p key={role}>{role}</p>) : <p>Ролей пока нет.</p>}
             </CardContent>
           </Card>
         </div>

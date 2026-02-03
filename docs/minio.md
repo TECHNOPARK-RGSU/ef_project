@@ -9,6 +9,7 @@ MINIO_ACCESS_KEY=change-me
 MINIO_SECRET_KEY=change-me
 MINIO_BUCKET=change-me
 MINIO_REGION=us-east-1
+MINIO_VERIFY_SSL=1
 MINIO_ENDPOINT=https://s3.example.com
 MINIO_PUBLIC_URL=https://s3.example.com
 
@@ -22,3 +23,9 @@ S3_BUCKET=change-me
 
 - MINIO_* — параметры удалённого MinIO.
 - AWS_* и S3_* нужны для совместимых SDK, используем те же ключи.
+
+## Проверка подключения
+
+```
+python manage.py check_minio
+```

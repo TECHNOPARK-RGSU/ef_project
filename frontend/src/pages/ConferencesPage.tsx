@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
-import { FALLBACK_CONFERENCES } from "@/lib/demo";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -49,10 +48,9 @@ export function ConferencesPage() {
   }, []);
 
   const visibleConferences = useMemo(() => {
-    const list = conferences.length ? conferences : FALLBACK_CONFERENCES;
-    if (!query.trim()) return list;
+    if (!query.trim()) return conferences;
     const needle = query.toLowerCase();
-    return list.filter(item => item.title.toLowerCase().includes(needle));
+    return conferences.filter(item => item.title.toLowerCase().includes(needle));
   }, [conferences, query]);
 
   const canSubmit =
@@ -167,9 +165,11 @@ export function ConferencesPage() {
         </div>
         <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
           <span
-            className={`rounded-full px-3 py-1 ${state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}
+            className={`rounded-full px-3 py-1 ${
+              state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+            }`}
           >
-            {state === "ready" ? "из API" : "демо"}
+            {state === "ready" ? "данные загружены" : "нет данных"}
           </span>
           <Button onClick={handleCreateClick}>Создать</Button>
         </div>
@@ -177,7 +177,7 @@ export function ConferencesPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div ref={formRef}>
-          <Card className="border-border/70 bg-card/80">
+      <Card className="border-border/70 bg-card/80">
             <CardHeader>
               <CardTitle className="text-lg">
                 {editingId ? "Редактирование конференции" : "Новая конференция"}
@@ -316,7 +316,7 @@ export function ConferencesPage() {
               Загружаем список конференций…
             </CardContent>
           </Card>
-        ) : (
+        ) : visibleConferences.length ? (
           visibleConferences.map(conf => (
             <Card key={conf.id} className="border-border/70 bg-card/80">
               <CardHeader className="space-y-2">
@@ -342,6 +342,12 @@ export function ConferencesPage() {
               </CardContent>
             </Card>
           ))
+        ) : (
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
+              Пока нет конференций. Создайте первую запись.
+            </CardContent>
+          </Card>
         )}
       </div>
     </section>

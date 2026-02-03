@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL, fetchList, fetchOne } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
-import { FALLBACK_CONFERENCES, FALLBACK_TRACKS } from "@/lib/demo";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type {
   Conference,
@@ -92,9 +91,9 @@ export function ConferenceDetailPage() {
     return () => controller.abort();
   }, [id]);
 
-  const visibleConference = conference || FALLBACK_CONFERENCES.find(item => item.id === id) || null;
+  const visibleConference = conference || null;
   const visibleSections = useMemo(() => {
-    if (!sections.length) return FALLBACK_TRACKS;
+    if (!sections.length) return [];
     return sections
       .filter(section => section.conference?.id === id)
       .slice(0, 6)
@@ -260,6 +259,16 @@ export function ConferenceDetailPage() {
       <Card className="border-border/70 bg-card/80">
         <CardContent className="p-6 text-sm text-muted-foreground">
           Некорректный идентификатор конференции.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (state === "ready" && !conference) {
+    return (
+      <Card className="border-border/70 bg-card/80">
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          Конференция не найдена или доступ ограничен.
         </CardContent>
       </Card>
     );

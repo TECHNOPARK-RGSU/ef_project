@@ -47,3 +47,9 @@ curl -X POST http://localhost:26111/api/conf/conferences/1/assign_projects/ \\
 ## Переменные окружения
 
 См. `.env.example` для backend.
+
+## Проверка MinIO
+
+```bash
+docker compose exec backend /app/.venv/bin/python manage.py check_minio
+```
