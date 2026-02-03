@@ -14,6 +14,8 @@ docker compose up
 - MinIO: внешний (указывается через переменные окружения)
 - Postgres: localhost:26113 (внешний, уже запущен)
 
+Backend запускается через gunicorn (без dev-сервера).
+
 ### Демоданные
 
 ```bash
