@@ -9,7 +9,7 @@ import { getAuthToken } from "@/lib/auth";
 import { FALLBACK_CONFERENCES } from "@/lib/demo";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 
 export function ConferencesPage() {
@@ -29,6 +29,7 @@ export function ConferencesPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -57,16 +58,22 @@ export function ConferencesPage() {
   const canSubmit =
     form.title.trim() && form.startDate && form.endDate && form.format;
 
+  const handleCreateClick = () => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const submitConference = async () => {
     setSubmitState("saving");
     setSubmitMessage(null);
     try {
       const token = getAuthToken();
       if (!token) throw new Error("missing token");
-    const endpoint = editingId ? `/api/conf/conferences/${editingId}/` : "/api/conf/conferences/";
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: editingId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+      const endpoint = editingId
+        ? `/api/conf/conferences/${editingId}/`
+        : "/api/conf/conferences/";
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
         body: JSON.stringify({
           title: form.title,
           start_date: form.startDate,
@@ -79,13 +86,13 @@ export function ConferencesPage() {
           prizes_count: Number(form.prizesCount),
         }),
       });
-    if (!response.ok) throw new Error("save failed");
-    const created = (await response.json()) as Conference;
-    setConferences(current =>
-      editingId ? current.map(conf => (conf.id === editingId ? created : conf)) : [created, ...current],
-    );
-    setSubmitState("saved");
-    setSubmitMessage(editingId ? "Конференция обновлена." : "Конференция создана.");
+      if (!response.ok) throw new Error("save failed");
+      const created = (await response.json()) as Conference;
+      setConferences(current =>
+        editingId ? current.map(conf => (conf.id === editingId ? created : conf)) : [created, ...current],
+      );
+      setSubmitState("saved");
+      setSubmitMessage(editingId ? "Конференция обновлена." : "Конференция создана.");
       setForm({
         title: "",
         startDate: "",
@@ -97,11 +104,11 @@ export function ConferencesPage() {
         prizesCount: "2",
       });
       setEditingId(null);
-  } catch (error) {
-    setSubmitState("error");
-    setSubmitMessage("Не удалось создать. Проверь API.");
-  }
-};
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitMessage(editingId ? "Не удалось обновить. Проверь API." : "Не удалось создать. Проверь API.");
+    }
+  };
 
   const startEdit = (conf: Conference) => {
     setEditingId(conf.id);
@@ -164,18 +171,19 @@ export function ConferencesPage() {
           >
             {state === "ready" ? "из API" : "демо"}
           </span>
-          <Button>Создать</Button>
+          <Button onClick={handleCreateClick}>Создать</Button>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование конференции" : "Новая конференция"}
-          </CardTitle>
-        </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <div ref={formRef}>
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {editingId ? "Редактирование конференции" : "Новая конференция"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="conf-title">Название</Label>
@@ -284,8 +292,9 @@ export function ConferencesPage() {
                 </Button>
               ) : null}
             </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-3">
           <Input
