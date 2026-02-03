@@ -15,11 +15,28 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.db import connections
+from django.db.utils import OperationalError
+from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
 
+
+def health(request):
+    db_ok = True
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except OperationalError:
+        db_ok = False
+    status = "ok" if db_ok else "degraded"
+    return JsonResponse({"status": status, "db": db_ok})
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/health/", health),
     path("api/users/", include("users.urls")),
     path("api/conf/", include("conf.urls")),
     path("api/auth/token/", obtain_auth_token),

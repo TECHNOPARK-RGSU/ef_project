@@ -22,6 +22,12 @@ Backend запускается через gunicorn (без dev-сервера).
 docker compose exec backend /app/.venv/bin/python manage.py seed_demo
 ```
 
+### Базовые справочники
+
+```bash
+docker compose exec backend /app/.venv/bin/python manage.py bootstrap_catalogs
+```
+
 ### Токен доступа
 
 После `seed_demo` в выводе будет токен организатора. В интерфейсе нажмите “Войти” и вставьте токен.  
