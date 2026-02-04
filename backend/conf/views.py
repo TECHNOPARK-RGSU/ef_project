@@ -9,6 +9,7 @@ from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -407,7 +408,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
     role_requirements = {
-        "create": ["organizer", "expert", "tutor"],
+        "create": ["organizer", "expert", "tutor", "student", "student2", "student3"],
         "update": ["organizer", "expert", "tutor"],
         "partial_update": ["organizer", "expert", "tutor"],
         "destroy": ["organizer"],
@@ -437,6 +438,28 @@ class CommentViewSet(viewsets.ModelViewSet):
                 Q(project__leader=user) | Q(project__members=user)
             ).distinct()
         return queryset.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        project = serializer.validated_data["project"]
+        role_code = getattr(user.role, "code", "").lower()
+
+        if role_code == "organizer":
+            serializer.save()
+            return
+
+        allowed = False
+        if role_code == "expert":
+            allowed = project.expert_assignments.filter(assignment__expert=user).exists()
+        elif role_code == "tutor":
+            allowed = project.tutor_id == user.id
+        elif role_code in {"student", "student2", "student3"}:
+            allowed = project.leader_id == user.id or project.members.filter(id=user.id).exists()
+
+        if not allowed:
+            raise PermissionDenied("Нет доступа к этому проекту.")
+
+        serializer.save(author=user)
 
 
 class EvaluationCriterionViewSet(viewsets.ModelViewSet):
@@ -501,6 +524,14 @@ class ProjectScoreViewSet(viewsets.ModelViewSet):
         if role_code in {"student", "student2", "student3"}:
             return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
         return queryset.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code == "expert":
+            serializer.save(evaluator=user)
+            return
+        serializer.save()
 
 
 class ProjectResultViewSet(viewsets.ReadOnlyModelViewSet):

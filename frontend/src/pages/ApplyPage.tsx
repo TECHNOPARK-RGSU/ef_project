@@ -38,6 +38,10 @@ export function ApplyPage() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [projectsQuery, setProjectsQuery] = useState("");
+  const [projectsSort, setProjectsSort] = useState<"updated_desc" | "title_asc">("updated_desc");
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  const [replyMessage, setReplyMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState({
     title: "",
@@ -107,6 +111,21 @@ export function ApplyPage() {
       return acc;
     }, {});
   }, [comments]);
+  const visibleProjects = useMemo(() => {
+    const needle = projectsQuery.trim().toLowerCase();
+    const filtered = projects.filter(project => {
+      if (!needle) return true;
+      return project.title.toLowerCase().includes(needle);
+    });
+    return [...filtered].sort((a, b) => {
+      if (projectsSort === "title_asc") {
+        return a.title.localeCompare(b.title);
+      }
+      const aTime = Date.parse(a.updated_at ?? a.created_at ?? "") || 0;
+      const bTime = Date.parse(b.updated_at ?? b.created_at ?? "") || 0;
+      return bTime - aTime;
+    });
+  }, [projects, projectsQuery, projectsSort]);
 
   const canSubmit =
     form.title.trim() &&
@@ -256,6 +275,55 @@ export function ApplyPage() {
       setSubmitMessage("Проект удалён.");
     } catch (error) {
       setSubmitMessage("Не удалось удалить проект.");
+    }
+  };
+
+  const updateProjectStatus = async (projectId: number, statusCode: string) => {
+    setSubmitMessage(null);
+    const status = statuses.find(item => item.code.toLowerCase() === statusCode);
+    if (!status) {
+      setSubmitMessage("Нужный статус не найден в справочнике.");
+      return;
+    }
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("missing token");
+      const response = await fetch(`${API_BASE_URL}/api/conf/projects/${projectId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ status_id: status.id }),
+      });
+      if (!response.ok) throw new Error("update failed");
+      const updated = (await response.json()) as Project;
+      setProjects(current => current.map(item => (item.id === projectId ? updated : item)));
+      setSubmitMessage("Статус проекта обновлен.");
+    } catch {
+      setSubmitMessage("Не удалось обновить статус.");
+    }
+  };
+
+  const sendReply = async (projectId: number) => {
+    setReplyMessage(null);
+    const text = (replyDrafts[projectId] ?? "").trim();
+    if (!text) {
+      setReplyMessage("Введите текст комментария.");
+      return;
+    }
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("missing token");
+      const response = await fetch(`${API_BASE_URL}/api/conf/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ project_id: projectId, text }),
+      });
+      if (!response.ok) throw new Error("comment failed");
+      const created = (await response.json()) as Comment;
+      setComments(current => [created, ...current]);
+      setReplyDrafts(current => ({ ...current, [projectId]: "" }));
+      setReplyMessage("Комментарий отправлен.");
+    } catch {
+      setReplyMessage("Не удалось отправить комментарий.");
     }
   };
 
@@ -541,15 +609,44 @@ export function ApplyPage() {
             </span>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
-            {projects.length ? (
-              projects.map(project => (
+            <div className="grid gap-2 md:grid-cols-[1fr_220px]">
+              <Input
+                value={projectsQuery}
+                onChange={event => setProjectsQuery(event.target.value)}
+                placeholder="Поиск по названию проекта"
+              />
+              <Select value={projectsSort} onValueChange={value => setProjectsSort(value as "updated_desc" | "title_asc")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Сортировка" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="updated_desc">Сначала новые</SelectItem>
+                  <SelectItem value="title_asc">По названию А-Я</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {visibleProjects.length ? (
+              visibleProjects.map(project => (
                 <div
                   key={project.id}
                   className="rounded-lg border border-border/60 bg-background/70 p-3 space-y-1"
                 >
                   <p className="font-semibold text-foreground">{project.title}</p>
                   <p>Секция: {project.section?.name || "не указана"}</p>
-                  <p>Статус: {project.status?.name || "не указан"}</p>
+                  <p>
+                    Статус:{" "}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        project.status?.code === "approved"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : project.status?.code === "rework"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {project.status?.name || "не указан"}
+                    </span>
+                  </p>
                   <p>Этап: {project.stage?.name || "не указан"}</p>
                   {commentsByProject[project.id]?.length ? (
                     <div className="rounded-md border border-border/60 bg-card/60 p-2">
@@ -559,6 +656,24 @@ export function ApplyPage() {
                           {item.text}
                         </p>
                       ))}
+                    </div>
+                  ) : null}
+                  {(isStudentRole || isTutorRole) && project.status?.code === "rework" ? (
+                    <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/70 p-2">
+                      <p className="text-xs uppercase tracking-[0.2em] text-amber-700">
+                        Ответить на комментарий
+                      </p>
+                      <Textarea
+                        value={replyDrafts[project.id] ?? ""}
+                        onChange={event =>
+                          setReplyDrafts(current => ({ ...current, [project.id]: event.target.value }))
+                        }
+                        placeholder="Опишите, что исправили, и задайте вопрос при необходимости"
+                        className="min-h-[72px]"
+                      />
+                      <Button size="sm" variant="outline" onClick={() => sendReply(project.id)}>
+                        Отправить комментарий
+                      </Button>
                     </div>
                   ) : null}
                   {project.files ? (
@@ -575,15 +690,29 @@ export function ApplyPage() {
                     <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
                       Редактировать
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => deleteProject(project.id)}>
-                      Удалить
-                    </Button>
+                    {isOrganizerRole ? (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "new")}>
+                          На рецензии
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
+                          На доработку
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "approved")}>
+                          Согласован
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteProject(project.id)}>
+                          Удалить
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               ))
             ) : (
               <p>Проектов пока нет.</p>
             )}
+            {replyMessage ? <p>{replyMessage}</p> : null}
           </CardContent>
         </Card>
         {isOrganizerRole ? (

@@ -100,6 +100,8 @@ export type Project = {
   status?: ProjectStatus | null;
   stage?: ParticipationStage | null;
   presentation_type?: PresentationType | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type ProjectScore = {
@@ -127,6 +129,8 @@ export type Comment = {
   text: string;
   project: Project;
   author?: User | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type AssignmentPlace = {
