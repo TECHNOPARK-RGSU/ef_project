@@ -99,6 +99,7 @@ class Command(BaseCommand):
         age_18_25 = self._get_or_create_age("18-25 лет", 18, 25)
 
         status_new = self._get_or_create_status("Новый", "new")
+        status_in_review = self._get_or_create_status("На рецензии", "in_review")
         status_review = self._get_or_create_status("На доработку", "rework")
         self._get_or_create_status("Согласован", "approved")
         self._get_or_create_status("В финал", "final")
@@ -223,7 +224,7 @@ class Command(BaseCommand):
             leader=participant,
             tutor=tutor,
             section=section_offline,
-            status=status_review,
+            status=status_in_review,
             stage=stage_qual,
             presentation_type=pres_oral,
             defaults={

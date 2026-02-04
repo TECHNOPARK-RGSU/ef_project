@@ -26,7 +26,6 @@ function getNavItems(roleCode: string): NavItem[] {
       { label: "Назначения", href: "/assignments" },
       { label: "Оценки", href: "/scores" },
       { label: "Комментарии", href: "/comments" },
-      { label: "Конференции", href: "/conferences" },
     ];
   }
   if (roleCode === "tutor" || roleCode === "student" || roleCode === "student2" || roleCode === "student3") {

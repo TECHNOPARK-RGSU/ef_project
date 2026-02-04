@@ -22,7 +22,12 @@ export type AgeCategory = {
 export type Section = {
   id: number;
   name: string;
-  conference?: { id?: number; title?: string } | null;
+  conference?: {
+    id?: number;
+    title?: string;
+    start_date?: string;
+    end_date?: string;
+  } | null;
   category?: { id?: number; name?: string } | null;
 };
 

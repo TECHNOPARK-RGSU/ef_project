@@ -101,7 +101,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
         if getattr(user, "is_superuser", False):
             return queryset
         role_code = getattr(user.role, "code", "").lower()
-        if role_code in {"organizer", "expert"}:
+        if role_code == "organizer":
             return queryset
         return queryset.none()
 
@@ -545,6 +545,20 @@ class ProjectResultViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["project__title"]
     ordering_fields = ["total_score", "rank"]
     ordering = ["rank"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code in {"organizer", "expert"}:
+            return queryset
+        if role_code == "tutor":
+            return queryset.filter(project__tutor=user)
+        if role_code in {"student", "student2", "student3"}:
+            return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
+        return queryset.none()
 
 
 class ExpertAssignmentViewSet(viewsets.ModelViewSet):

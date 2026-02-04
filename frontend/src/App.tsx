@@ -90,7 +90,7 @@ export function App() {
     return "/";
   }, [isExpert, isOrganizer, isStudent, isTutor]);
 
-  const canAccessConferences = isOrganizer || isExpert;
+  const canAccessConferences = isOrganizer;
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;
   const canAccessScores = isOrganizer || isExpert;

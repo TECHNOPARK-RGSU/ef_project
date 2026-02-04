@@ -56,6 +56,7 @@ class Command(BaseCommand):
     def _statuses(self):
         items = [
             ("Новый", "new"),
+            ("На рецензии", "in_review"),
             ("На доработку", "rework"),
             ("Согласован", "approved"),
             ("В финал", "final"),
