@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import type { Comment, Project, User } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function CommentsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -19,6 +19,14 @@ export function CommentsPage() {
     authorId: "none",
     text: "",
   });
+  const allowedAuthors = useMemo(
+    () =>
+      users.filter(user => {
+        const code = (user.role?.code ?? "").toLowerCase();
+        return code === "organizer" || code === "expert" || code === "tutor";
+      }),
+    [users],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -140,7 +148,7 @@ export function CommentsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без автора</SelectItem>
-                {users.map(user => (
+                {allowedAuthors.map(user => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.last_name} {user.first_name}
                   </SelectItem>

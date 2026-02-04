@@ -326,9 +326,9 @@ export function ConferencesPage() {
                 <CardTitle className="text-lg">{conf.title}</CardTitle>
                 <p className="text-sm text-muted-foreground">{conf.location || "Место уточняется"}</p>
               </CardHeader>
-              <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
+              <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>{formatFormat(conf)}</span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant="secondary" asChild>
                     <Link href={`/conferences/${conf.id}`}>Карточка</Link>
                   </Button>

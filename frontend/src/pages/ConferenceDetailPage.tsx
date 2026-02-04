@@ -108,6 +108,10 @@ export function ConferenceDetailPage() {
     if (!projects.length) return [];
     return projects.filter(project => project.section?.conference?.id === id);
   }, [projects, id]);
+  const expertUsers = useMemo(
+    () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "expert"),
+    [users],
+  );
 
   const submitCriterion = async () => {
     setCriteriaMessage(null);
@@ -330,7 +334,9 @@ export function ConferenceDetailPage() {
                 <div className="h-full w-[70%] rounded-full bg-primary" />
               </div>
             </div>
-            <Button className="w-full">Редактировать</Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/conferences">Изменить в списке конференций</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -469,8 +475,8 @@ export function ConferenceDetailPage() {
                   <SelectValue placeholder="Выберите пользователя" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.length ? (
-                    users.map(user => (
+                  {expertUsers.length ? (
+                    expertUsers.map(user => (
                       <SelectItem key={user.id} value={String(user.id)}>
                         {user.last_name} {user.first_name}
                       </SelectItem>
@@ -525,7 +531,7 @@ export function ConferenceDetailPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Результаты</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={runCalculation}>
               Рассчитать
             </Button>

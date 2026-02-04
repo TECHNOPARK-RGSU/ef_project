@@ -4,11 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { Conference, ExpertAssignment } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 export function AssignmentsPage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isOrganizerRole = roleCode === "organizer";
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [assignments, setAssignments] = useState<ExpertAssignment[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -97,59 +100,65 @@ export function AssignmentsPage() {
     <section className="space-y-6">
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">назначения</p>
-        <h1 className="text-3xl font-semibold">Распределение работ</h1>
+        <h1 className="text-3xl font-semibold">{isOrganizerRole ? "Распределение работ" : "Мои назначения"}</h1>
         <p className="text-sm text-muted-foreground">
-          Организатор распределяет проекты между экспертами, эксперты видят свои задания.
+          {isOrganizerRole
+            ? "Организатор распределяет проекты между экспертами."
+            : "Здесь отображаются только ваши проекты на проверку."}
         </p>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">Распределить автоматически</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
-          <div className="space-y-2">
-            <Label>Конференция</Label>
-            <Select value={form.conferenceId || undefined} onValueChange={value => setForm({ ...form, conferenceId: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Выберите конференцию" />
-              </SelectTrigger>
-              <SelectContent>
-                {conferences.map(conf => (
-                  <SelectItem key={conf.id} value={String(conf.id)}>
-                    {conf.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Этап</Label>
-            <Select value={form.stage} onValueChange={value => setForm({ ...form, stage: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Этап" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="online">Заочный</SelectItem>
-                <SelectItem value="offline">Очный</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Работ на эксперта</Label>
-            <Input
-              type="number"
-              min="1"
-              value={form.perExpert}
-              onChange={event => setForm({ ...form, perExpert: event.target.value })}
-            />
-          </div>
-          <div className="flex items-end">
-            <Button onClick={assignProjects}>Распределить</Button>
-          </div>
-          {message ? <p className="col-span-full">{message}</p> : null}
-        </CardContent>
-      </Card>
+      {isOrganizerRole ? (
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Распределить автоматически</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
+            <div className="space-y-2">
+              <Label>Конференция</Label>
+              <Select value={form.conferenceId || undefined} onValueChange={value => setForm({ ...form, conferenceId: value })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите конференцию" />
+                </SelectTrigger>
+                <SelectContent>
+                  {conferences.map(conf => (
+                    <SelectItem key={conf.id} value={String(conf.id)}>
+                      {conf.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Этап</Label>
+              <Select value={form.stage} onValueChange={value => setForm({ ...form, stage: value })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Этап" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Заочный</SelectItem>
+                  <SelectItem value="offline">Очный</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Работ на эксперта</Label>
+              <Input
+                type="number"
+                min="1"
+                value={form.perExpert}
+                onChange={event => setForm({ ...form, perExpert: event.target.value })}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={assignProjects}>Распределить</Button>
+            </div>
+            {message ? <p className="col-span-full">{message}</p> : null}
+          </CardContent>
+        </Card>
+      ) : message ? (
+        <p className="text-sm text-muted-foreground">{message}</p>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {assignments.length ? (

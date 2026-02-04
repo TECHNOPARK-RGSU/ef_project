@@ -1,6 +1,8 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from users.models import EducationalOrganization, Role, User
 from users.serializers import (
     EducationalOrganizationSerializer,
@@ -71,3 +73,8 @@ class UserViewSet(viewsets.ModelViewSet):
     ]
     ordering_fields = ["last_name", "first_name", "email", "created_at"]
     ordering = ["last_name", "first_name"]
+
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)

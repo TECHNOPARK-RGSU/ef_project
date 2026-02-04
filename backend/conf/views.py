@@ -2,6 +2,7 @@ import os
 import tempfile
 import zipfile
 
+from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend

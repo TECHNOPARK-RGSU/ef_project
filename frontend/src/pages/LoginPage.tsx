@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
-import { getAuthToken, setAuthToken } from "@/lib/auth";
+import { getAuthToken, setAuthToken, setAuthUserInfo } from "@/lib/auth";
 import { useState } from "react";
 
 export function LoginPage() {
@@ -12,6 +12,25 @@ export function LoginPage() {
   const [tokenValue, setTokenValue] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const existingToken = getAuthToken();
+
+  const loadMe = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/me/`, {
+      headers: { Authorization: `Token ${token}` },
+    });
+    if (!response.ok) return;
+    const data = (await response.json()) as {
+      id: number;
+      role?: { code?: string | null } | null;
+      first_name?: string | null;
+      last_name?: string | null;
+    };
+    setAuthUserInfo({
+      id: data.id,
+      roleCode: (data.role?.code ?? "").toLowerCase(),
+      firstName: data.first_name ?? undefined,
+      lastName: data.last_name ?? undefined,
+    });
+  };
 
   const login = async () => {
     setMessage(null);
@@ -34,16 +53,19 @@ export function LoginPage() {
       return;
     }
     setAuthToken(data.token);
-    window.location.href = "/conferences";
+    await loadMe(data.token);
+    window.location.href = "/";
   };
 
-  const saveToken = () => {
+  const saveToken = async () => {
     if (!tokenValue.trim()) {
       setMessage("Введите токен.");
       return;
     }
-    setAuthToken(tokenValue.trim());
-    window.location.href = "/conferences";
+    const token = tokenValue.trim();
+    setAuthToken(token);
+    await loadMe(token);
+    window.location.href = "/";
   };
 
   return (

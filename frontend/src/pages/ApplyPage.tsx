@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type {
   ParticipationStage,
   PresentationType,
@@ -18,6 +18,12 @@ import type {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export function ApplyPage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isStudentRole =
+    roleCode === "student" || roleCode === "student2" || roleCode === "student3";
+  const isTutorRole = roleCode === "tutor";
+  const isOrganizerRole = roleCode === "organizer";
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [roles, setRoles] = useState<Role[]>([]);
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
@@ -72,6 +78,18 @@ export function ApplyPage() {
 
   const visibleRoles = useMemo(() => roles.map(role => `${role.name} — ${role.code}`), [roles]);
   const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(status => status.name), [statuses]);
+  const studentUsers = useMemo(
+    () =>
+      users.filter(user => {
+        const code = (user.role?.code ?? "").toLowerCase();
+        return code === "student" || code === "student2" || code === "student3";
+      }),
+    [users],
+  );
+  const tutorUsers = useMemo(
+    () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "tutor"),
+    [users],
+  );
 
   const canSubmit =
     form.title.trim() &&
@@ -80,6 +98,22 @@ export function ApplyPage() {
     form.statusId &&
     form.stageId &&
     form.presentationTypeId;
+
+  useEffect(() => {
+    if (!isStudentRole || !authUser?.id) return;
+    if (form.leaderId) return;
+    setForm(current => ({ ...current, leaderId: String(authUser.id) }));
+  }, [authUser?.id, form.leaderId, isStudentRole]);
+
+  useEffect(() => {
+    if (isOrganizerRole || form.statusId || !statuses.length) return;
+    setForm(current => ({ ...current, statusId: String(statuses[0].id) }));
+  }, [form.statusId, isOrganizerRole, statuses]);
+
+  useEffect(() => {
+    if (isOrganizerRole || form.stageId || !stages.length) return;
+    setForm(current => ({ ...current, stageId: String(stages[0].id) }));
+  }, [form.stageId, isOrganizerRole, stages]);
 
   const submitProject = async () => {
     setSubmitState("saving");
@@ -123,7 +157,7 @@ export function ApplyPage() {
         editingId ? current.map(item => (item.id === editingId ? created : item)) : [created, ...current],
       );
       setSubmitState("saved");
-      setSubmitMessage(editingId ? "Проект обновлен." : "Черновик сохранён в API.");
+      setSubmitMessage(editingId ? "Проект обновлен." : "Проект сохранен.");
       setForm({
         title: "",
         description: "",
@@ -215,7 +249,11 @@ export function ApplyPage() {
           <CardTitle className="text-2xl">
             {editingId ? "Редактирование заявки" : "Новая заявка"}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">Черновик без отправки — подготовьте данные.</p>
+          <p className="text-sm text-muted-foreground">
+            {isOrganizerRole
+              ? "Заявка сохраняется сразу в системе как проект. Отдельной отправки не требуется."
+              : "Заполните только основные поля: название, секцию, формат и файл проекта."}
+          </p>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
@@ -230,27 +268,38 @@ export function ApplyPage() {
             </div>
             <div className="space-y-2">
               <Label>Руководитель</Label>
-              <Select
-                value={form.leaderId || undefined}
-                onValueChange={value => setForm(current => ({ ...current, leaderId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите пользователя" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.length ? (
-                    users.map(user => (
-                      <SelectItem key={user.id} value={String(user.id)}>
-                        {user.last_name} {user.first_name}
+              {isStudentRole ? (
+                <Input
+                  value={
+                    studentUsers.find(user => user.id === authUser?.id)
+                      ? `${studentUsers.find(user => user.id === authUser?.id)?.last_name ?? ""} ${studentUsers.find(user => user.id === authUser?.id)?.first_name ?? ""}`.trim()
+                      : "Текущий пользователь"
+                  }
+                  disabled
+                />
+              ) : (
+                <Select
+                  value={form.leaderId || undefined}
+                  onValueChange={value => setForm(current => ({ ...current, leaderId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите пользователя" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {studentUsers.length ? (
+                      studentUsers.map(user => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {user.last_name} {user.first_name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет пользователей
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет пользователей
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <div className="space-y-2">
@@ -264,7 +313,7 @@ export function ApplyPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без руководителя</SelectItem>
-                {users.map(user => (
+                {tutorUsers.map(user => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.last_name} {user.first_name}
                   </SelectItem>
@@ -284,7 +333,7 @@ export function ApplyPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Без участника</SelectItem>
-                  {users.map(user => (
+                  {studentUsers.map(user => (
                     <SelectItem key={user.id} value={String(user.id)}>
                       {user.last_name} {user.first_name}
                     </SelectItem>
@@ -303,7 +352,7 @@ export function ApplyPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Без участника</SelectItem>
-                  {users.map(user => (
+                  {studentUsers.map(user => (
                     <SelectItem key={user.id} value={String(user.id)}>
                       {user.last_name} {user.first_name}
                     </SelectItem>
@@ -364,56 +413,58 @@ export function ApplyPage() {
               </Select>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Статус</Label>
-              <Select
-                value={form.statusId || undefined}
-                onValueChange={value => setForm(current => ({ ...current, statusId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Статус проекта" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.length ? (
-                    statuses.map(status => (
-                      <SelectItem key={status.id} value={String(status.id)}>
-                        {status.name}
+          {isOrganizerRole ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Статус</Label>
+                <Select
+                  value={form.statusId || undefined}
+                  onValueChange={value => setForm(current => ({ ...current, statusId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Статус проекта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statuses.length ? (
+                      statuses.map(status => (
+                        <SelectItem key={status.id} value={String(status.id)}>
+                          {status.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет статусов
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет статусов
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Этап</Label>
-              <Select
-                value={form.stageId || undefined}
-                onValueChange={value => setForm(current => ({ ...current, stageId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Этап участия" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stages.length ? (
-                    stages.map(stage => (
-                      <SelectItem key={stage.id} value={String(stage.id)}>
-                        {stage.name}
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Этап</Label>
+                <Select
+                  value={form.stageId || undefined}
+                  onValueChange={value => setForm(current => ({ ...current, stageId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Этап участия" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stages.length ? (
+                      stages.map(stage => (
+                        <SelectItem key={stage.id} value={String(stage.id)}>
+                          {stage.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет этапов
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет этапов
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="desc">Краткое описание</Label>
             <Textarea
@@ -456,7 +507,7 @@ export function ApplyPage() {
                 ? "Сохраняем…"
                 : editingId
                   ? "Сохранить"
-                  : "Сохранить черновик"}
+                  : "Сохранить проект"}
             </Button>
             {editingId ? (
               <Button variant="outline" onClick={cancelEdit}>
@@ -515,45 +566,60 @@ export function ApplyPage() {
             )}
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Статусы проекта</CardTitle>
-            <span
-              className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {state === "ready" ? "данные загружены" : "нет данных"}
-            </span>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {visibleStatuses.length ? (
-              visibleStatuses.map(status => (
-                <div key={status} className="flex items-center justify-between">
-                  <span>{status}</span>
-                  <span className="h-2 w-12 rounded-full bg-primary/30" />
-                </div>
-              ))
-            ) : (
-              <p>Статусов пока нет.</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Роли</CardTitle>
-            <span
-              className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {state === "ready" ? "данные загружены" : "нет данных"}
-            </span>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {visibleRoles.length ? visibleRoles.map(role => <p key={role}>{role}</p>) : <p>Ролей пока нет.</p>}
-          </CardContent>
-        </Card>
+        {isOrganizerRole ? (
+          <>
+            <Card className="border-border/70 bg-card/80">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Статусы проекта</CardTitle>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                    state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {state === "ready" ? "данные загружены" : "нет данных"}
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                {visibleStatuses.length ? (
+                  visibleStatuses.map(status => (
+                    <div key={status} className="flex items-center justify-between">
+                      <span>{status}</span>
+                      <span className="h-2 w-12 rounded-full bg-primary/30" />
+                    </div>
+                  ))
+                ) : (
+                  <p>Статусов пока нет.</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/80">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Роли</CardTitle>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                    state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {state === "ready" ? "данные загружены" : "нет данных"}
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                {visibleRoles.length ? visibleRoles.map(role => <p key={role}>{role}</p>) : <p>Ролей пока нет.</p>}
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">{isTutorRole ? "Режим наставника" : "Режим участника"}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-2">
+              <p>1. Заполните основные поля заявки.</p>
+              <p>2. Добавьте файл работы.</p>
+              <p>3. Нажмите «Сохранить проект».</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </section>
   );

@@ -49,8 +49,21 @@ function SelectContent({
   children,
   position = "popper",
   align = "center",
+  searchable = true,
+  searchPlaceholder = "Поиск...",
+  onOpenAutoFocus,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}) {
+  const [query, setQuery] = React.useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = React.useMemo(
+    () => filterSelectChildren(children, normalizedQuery),
+    [children, normalizedQuery],
+  );
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -63,8 +76,23 @@ function SelectContent({
         )}
         position={position}
         align={align}
+        onOpenAutoFocus={event => {
+          setQuery("");
+          onOpenAutoFocus?.(event);
+        }}
         {...props}
       >
+        {searchable ? (
+          <div className="border-b border-border/60 bg-popover p-2">
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              onKeyDown={event => event.stopPropagation()}
+            />
+          </div>
+        ) : null}
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           className={cn(
@@ -73,7 +101,11 @@ function SelectContent({
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1",
           )}
         >
-          {children}
+          {filtered.visibleCount ? (
+            filtered.children
+          ) : (
+            <div className="px-2 py-2 text-xs text-muted-foreground">Ничего не найдено</div>
+          )}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
       </SelectPrimitive.Content>
@@ -146,6 +178,57 @@ function SelectScrollDownButton({
       <ChevronDownIcon className="size-4" />
     </SelectPrimitive.ScrollDownButton>
   );
+}
+
+type FilterResult = {
+  children: React.ReactNode;
+  visibleCount: number;
+};
+
+function filterSelectChildren(children: React.ReactNode, query: string): FilterResult {
+  let visibleCount = 0;
+
+  const mapped = React.Children.map(children, child => {
+    if (!React.isValidElement(child)) return child;
+    const element = child as React.ReactElement<{ children?: React.ReactNode }>;
+    const childType = element.type;
+
+    if (isSelectItemType(childType)) {
+      const text = extractNodeText(element.props.children).toLowerCase();
+      const matches = !query || text.includes(query);
+      if (matches) visibleCount += 1;
+      return matches ? element : null;
+    }
+
+    if (element.props.children === undefined) return element;
+    const nested = filterSelectChildren(element.props.children, query);
+    visibleCount += nested.visibleCount;
+
+    if (isSelectGroupType(childType) && nested.visibleCount === 0) {
+      return null;
+    }
+
+    return React.cloneElement(element, { ...element.props, children: nested.children });
+  });
+
+  return { children: mapped, visibleCount };
+}
+
+function isSelectItemType(type: unknown): boolean {
+  return type === SelectItem || type === SelectPrimitive.Item;
+}
+
+function isSelectGroupType(type: unknown): boolean {
+  return type === SelectGroup || type === SelectPrimitive.Group;
+}
+
+function extractNodeText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractNodeText).join(" ");
+  if (React.isValidElement(node)) {
+    return extractNodeText((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
 }
 
 export {

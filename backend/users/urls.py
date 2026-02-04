@@ -16,5 +16,6 @@ router.register(r"roles", RoleViewSet, basename="role")
 router.register(r"users", UserViewSet, basename="user")
 
 urlpatterns = [
+    path("me/", UserViewSet.as_view({"get": "me"}), name="users-me"),
     path("", include(router.urls)),
 ]

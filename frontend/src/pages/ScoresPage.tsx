@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import type { EvaluationCriterion, Project, ProjectScore, User } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function ScoresPage() {
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>([]);
@@ -21,6 +21,10 @@ export function ScoresPage() {
     evaluatorId: "none",
     score: "",
   });
+  const expertUsers = useMemo(
+    () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "expert"),
+    [users],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -167,7 +171,7 @@ export function ScoresPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без оценщика</SelectItem>
-                {users.map(user => (
+                {expertUsers.map(user => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.last_name} {user.first_name}
                   </SelectItem>

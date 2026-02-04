@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchList } from "@/lib/api";
+import { getAuthUserInfo } from "@/lib/auth";
 import { FEATURES, STEPS } from "@/lib/content";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference, ProjectStatus, Role, Section } from "@/lib/types";
@@ -25,6 +26,11 @@ const toTrackCards = (sections: Section[]) =>
   }));
 
 export function HomePage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isStudentRole = roleCode === "student" || roleCode === "student2" || roleCode === "student3";
+  const isTutorRole = roleCode === "tutor";
+  const isExpertRole = roleCode === "expert";
   const [apiState, setApiState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [metaState, setMetaState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
@@ -86,6 +92,66 @@ export function HomePage() {
     { value: String(conferences.length), label: "Конференций" },
     { value: String(statuses.length), label: "Статусов проекта" },
   ];
+
+  if (isStudentRole || isTutorRole) {
+    return (
+      <section className="mx-auto max-w-3xl space-y-6">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            {isTutorRole ? "наставник" : "участник"}
+          </p>
+          <h1 className="text-3xl font-semibold">
+            {isTutorRole ? "Работа с проектами" : "Мои заявки"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {isTutorRole
+              ? "Добавляйте и редактируйте проекты учеников в одном разделе."
+              : "Создавайте и обновляйте проекты в упрощенном интерфейсе."}
+          </p>
+        </div>
+        <Card className="border-border/70 bg-card/85">
+          <CardHeader>
+            <CardTitle className="text-xl">Что делать дальше</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>1. Перейдите в раздел «Мои проекты».</p>
+            <p>2. Заполните форму и добавьте файл проекта.</p>
+            <p>3. Проверяйте список сохраненных проектов справа.</p>
+            <Button className="w-full sm:w-auto" asChild>
+              <Link href="/apply">Открыть мои проекты</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
+  if (isExpertRole) {
+    return (
+      <section className="mx-auto max-w-4xl space-y-6">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">эксперт</p>
+          <h1 className="text-3xl font-semibold">Проверка работ</h1>
+          <p className="text-sm text-muted-foreground">
+            Откройте назначения, скачайте архив работ и выставляйте оценки по критериям.
+          </p>
+        </div>
+        <Card className="border-border/70 bg-card/85">
+          <CardHeader>
+            <CardTitle className="text-xl">Быстрый старт</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>1. Перейдите в «Назначения».</p>
+            <p>2. Скачайте ZIP с работами по каждому назначению.</p>
+            <p>3. Для очных этапов ориентируйтесь на аудиторию в карточке назначения.</p>
+            <Button className="w-full sm:w-auto" asChild>
+              <Link href="/assignments">Открыть назначения</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
 
   return (
     <>
@@ -336,8 +402,8 @@ export function HomePage() {
       <section className="mt-16 grid gap-6 md:grid-cols-[1.1fr_0.9fr]" id="submit">
         <Card className="border-border/70 bg-card/85 animate-rise">
           <CardHeader>
-            <CardTitle className="text-xl">Черновик заявки</CardTitle>
-            <p className="text-sm text-muted-foreground">Форма без отправки — только структура.</p>
+            <CardTitle className="text-xl">Форма заявки (пример)</CardTitle>
+            <p className="text-sm text-muted-foreground">Поля и структура перед заполнением в рабочем разделе.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
@@ -387,7 +453,7 @@ export function HomePage() {
               />
             </div>
             <Button className="w-full" asChild>
-              <Link href="/apply">Сохранить черновик</Link>
+              <Link href="/apply">Перейти к заявке</Link>
             </Button>
           </CardContent>
         </Card>
