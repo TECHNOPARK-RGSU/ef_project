@@ -3,6 +3,7 @@ import tempfile
 import zipfile
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
@@ -92,6 +93,16 @@ class ConferenceViewSet(viewsets.ModelViewSet):
     search_fields = ["title", "description", "location"]
     ordering_fields = ["title", "start_date", "end_date", "created_at"]
     ordering = ["-start_date"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code in {"organizer", "expert"}:
+            return queryset
+        return queryset.none()
 
     @action(detail=True, methods=["post"])
     def calculate_results(self, request, pk=None):
@@ -370,6 +381,24 @@ class ProjectViewSet(viewsets.ModelViewSet):
     ordering_fields = ["title", "created_at"]
     ordering = ["title"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code == "organizer":
+            return queryset
+        if role_code == "expert":
+            return queryset.filter(
+                expert_assignments__assignment__expert=user
+            ).distinct()
+        if role_code == "tutor":
+            return queryset.filter(tutor=user)
+        if role_code in {"student", "student2", "student3"}:
+            return queryset.filter(Q(leader=user) | Q(members=user)).distinct()
+        return queryset.none()
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     """ViewSet для комментариев."""
@@ -388,6 +417,26 @@ class CommentViewSet(viewsets.ModelViewSet):
     search_fields = ["text"]
     ordering_fields = ["created_at"]
     ordering = ["created_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code == "organizer":
+            return queryset
+        if role_code == "expert":
+            return queryset.filter(
+                Q(author=user) | Q(project__expert_assignments__assignment__expert=user)
+            ).distinct()
+        if role_code == "tutor":
+            return queryset.filter(Q(author=user) | Q(project__tutor=user)).distinct()
+        if role_code in {"student", "student2", "student3"}:
+            return queryset.filter(
+                Q(project__leader=user) | Q(project__members=user)
+            ).distinct()
+        return queryset.none()
 
 
 class EvaluationCriterionViewSet(viewsets.ModelViewSet):
@@ -408,6 +457,16 @@ class EvaluationCriterionViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "max_score", "created_at"]
     ordering = ["name"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code in {"organizer", "expert"}:
+            return queryset
+        return queryset.none()
+
 
 class ProjectScoreViewSet(viewsets.ModelViewSet):
     """ViewSet для оценок проектов."""
@@ -426,6 +485,22 @@ class ProjectScoreViewSet(viewsets.ModelViewSet):
     search_fields = ["project__title"]
     ordering_fields = ["created_at", "score"]
     ordering = ["-created_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+        role_code = getattr(user.role, "code", "").lower()
+        if role_code == "organizer":
+            return queryset
+        if role_code == "expert":
+            return queryset.filter(evaluator=user)
+        if role_code == "tutor":
+            return queryset.filter(project__tutor=user)
+        if role_code in {"student", "student2", "student3"}:
+            return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
+        return queryset.none()
 
 
 class ProjectResultViewSet(viewsets.ReadOnlyModelViewSet):

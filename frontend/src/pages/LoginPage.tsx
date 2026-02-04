@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
 import { getAuthToken, setAuthToken, setAuthUserInfo } from "@/lib/auth";
 import { useState } from "react";
+import projectarisLogo from "@/assets/projectaris-logo.svg";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -72,6 +73,10 @@ export function LoginPage() {
     <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
       <Card className="border-border/70 bg-card/80">
         <CardHeader>
+          <div className="mb-2 flex items-center gap-3">
+            <img src={projectarisLogo} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
+            <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">projectaris</p>
+          </div>
           <CardTitle className="text-2xl">Вход</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">

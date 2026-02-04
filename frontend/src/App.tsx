@@ -5,11 +5,13 @@ import { CatalogsPage } from "@/pages/CatalogsPage";
 import { CommentsPage } from "@/pages/CommentsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
+import { CriteriaPage } from "@/pages/CriteriaPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SectionsPage } from "@/pages/SectionsPage";
+import { ScoresPage } from "@/pages/ScoresPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
@@ -91,14 +93,20 @@ export function App() {
   const canAccessConferences = isOrganizer || isExpert;
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;
+  const canAccessScores = isOrganizer || isExpert;
+  const canAccessCriteria = isOrganizer;
+  const canAccessComments = isOrganizer || isExpert || isTutor;
   const canAccessAdminCatalogs = isOrganizer;
 
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login") return true;
     if (path === "/apply") return canAccessApply;
     if (path === "/assignments") return canAccessAssignments;
+    if (path === "/scores") return canAccessScores;
+    if (path === "/criteria") return canAccessCriteria;
+    if (path === "/comments") return canAccessComments;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
-    if (path === "/sections" || path === "/roles" || path === "/users" || path === "/catalogs" || path === "/comments") {
+    if (path === "/sections" || path === "/roles" || path === "/users" || path === "/catalogs") {
       return canAccessAdminCatalogs;
     }
     return false;
@@ -133,11 +141,13 @@ export function App() {
           {canAccessConferences ? <Route path="/conferences/:id" component={ConferenceDetailPage} /> : null}
           {canAccessApply ? <Route path="/apply" component={ApplyPage} /> : null}
           {canAccessAssignments ? <Route path="/assignments" component={AssignmentsPage} /> : null}
+          {canAccessCriteria ? <Route path="/criteria" component={CriteriaPage} /> : null}
+          {canAccessScores ? <Route path="/scores" component={ScoresPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/comments" component={CommentsPage} /> : null}
+          {canAccessComments ? <Route path="/comments" component={CommentsPage} /> : null}
           <Route path="/login" component={LoginPage} />
           <Route>
             <NotFoundPage />

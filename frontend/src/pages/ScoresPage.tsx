@@ -4,11 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { EvaluationCriterion, Project, ProjectScore, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 
 export function ScoresPage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isOrganizerRole = roleCode === "organizer";
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -61,7 +64,9 @@ export function ScoresPage() {
       body: JSON.stringify({
         project_id: Number(form.projectId),
         criterion_id: Number(form.criterionId),
-        evaluator_id: form.evaluatorId === "none" ? null : Number(form.evaluatorId),
+        evaluator_id: isOrganizerRole
+          ? (form.evaluatorId === "none" ? null : Number(form.evaluatorId))
+          : (authUser?.id ?? null),
         score: Number(form.score),
       }),
     });
@@ -163,22 +168,24 @@ export function ScoresPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Оценщик</Label>
-            <Select value={form.evaluatorId} onValueChange={value => setForm({ ...form, evaluatorId: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Опционально" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Без оценщика</SelectItem>
-                {expertUsers.map(user => (
-                  <SelectItem key={user.id} value={String(user.id)}>
-                    {user.last_name} {user.first_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isOrganizerRole ? (
+            <div className="space-y-2">
+              <Label>Оценщик</Label>
+              <Select value={form.evaluatorId} onValueChange={value => setForm({ ...form, evaluatorId: value })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Опционально" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Без оценщика</SelectItem>
+                  {expertUsers.map(user => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.last_name} {user.first_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label>Баллы</Label>
             <Input

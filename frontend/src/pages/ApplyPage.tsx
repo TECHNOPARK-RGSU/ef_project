@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type {
+  Comment,
   ParticipationStage,
   PresentationType,
   Project,
@@ -32,6 +33,7 @@ export function ApplyPage() {
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -65,6 +67,7 @@ export function ApplyPage() {
         ),
         fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
         fetchList<Project>("/api/conf/projects/", controller.signal).then(setProjects),
+        fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
       ];
       const results = await Promise.allSettled(requests);
       if (!controller.signal.aborted) {
@@ -90,6 +93,20 @@ export function ApplyPage() {
     () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "tutor"),
     [users],
   );
+  const currentStudentName = useMemo(() => {
+    const currentStudent = studentUsers.find(user => user.id === authUser?.id);
+    if (!currentStudent) return "Текущий пользователь";
+    return `${currentStudent.last_name ?? ""} ${currentStudent.first_name ?? ""}`.trim();
+  }, [authUser?.id, studentUsers]);
+  const commentsByProject = useMemo(() => {
+    return comments.reduce<Record<number, Comment[]>>((acc, item) => {
+      const projectId = item.project?.id;
+      if (!projectId) return acc;
+      if (!acc[projectId]) acc[projectId] = [];
+      acc[projectId].push(item);
+      return acc;
+    }, {});
+  }, [comments]);
 
   const canSubmit =
     form.title.trim() &&
@@ -269,14 +286,7 @@ export function ApplyPage() {
             <div className="space-y-2">
               <Label>Руководитель</Label>
               {isStudentRole ? (
-                <Input
-                  value={
-                    studentUsers.find(user => user.id === authUser?.id)
-                      ? `${studentUsers.find(user => user.id === authUser?.id)?.last_name ?? ""} ${studentUsers.find(user => user.id === authUser?.id)?.first_name ?? ""}`.trim()
-                      : "Текущий пользователь"
-                  }
-                  disabled
-                />
+                <Input value={currentStudentName} disabled />
               ) : (
                 <Select
                   value={form.leaderId || undefined}
@@ -541,6 +551,16 @@ export function ApplyPage() {
                   <p>Секция: {project.section?.name || "не указана"}</p>
                   <p>Статус: {project.status?.name || "не указан"}</p>
                   <p>Этап: {project.stage?.name || "не указан"}</p>
+                  {commentsByProject[project.id]?.length ? (
+                    <div className="rounded-md border border-border/60 bg-card/60 p-2">
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Комментарии</p>
+                      {commentsByProject[project.id].slice(0, 2).map(item => (
+                        <p key={item.id} className="text-sm">
+                          {item.text}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                   {project.files ? (
                     <a
                       href={project.files}

@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { clearAuthToken, getAuthToken } from "@/lib/auth";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import projectarisLogo from "@/assets/projectaris-logo.svg";
 
 type NavItem = { label: string; href: string };
 
@@ -12,6 +13,9 @@ function getNavItems(roleCode: string): NavItem[] {
       { label: "Конференции", href: "/conferences" },
       { label: "Заявки", href: "/apply" },
       { label: "Назначения", href: "/assignments" },
+      { label: "Критерии", href: "/criteria" },
+      { label: "Оценки", href: "/scores" },
+      { label: "Комментарии", href: "/comments" },
       { label: "Пользователи", href: "/users" },
       { label: "Справочники", href: "/catalogs" },
     ];
@@ -20,6 +24,8 @@ function getNavItems(roleCode: string): NavItem[] {
     return [
       { label: "Главная", href: "/" },
       { label: "Назначения", href: "/assignments" },
+      { label: "Оценки", href: "/scores" },
+      { label: "Комментарии", href: "/comments" },
       { label: "Конференции", href: "/conferences" },
     ];
   }
@@ -37,6 +43,16 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
   const [location] = useLocation();
   const normalizedRole = roleCode.toLowerCase();
   const navItems = getNavItems(normalizedRole);
+  const roleLabel =
+    normalizedRole === "organizer"
+      ? "Организатор"
+      : normalizedRole === "expert"
+        ? "Эксперт"
+        : normalizedRole === "tutor"
+          ? "Наставник"
+          : normalizedRole === "student" || normalizedRole === "student2" || normalizedRole === "student3"
+            ? "Ученик"
+            : "";
 
   const handleLogout = () => {
     clearAuthToken();
@@ -50,12 +66,10 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/75 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-6">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              ЭФ
-            </div>
+            <img src={projectarisLogo} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">конференции</p>
-              <p className="text-base font-semibold md:text-lg">EF Platform</p>
+              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">projectaris</p>
+              <p className="text-base font-semibold md:text-lg">Платформа конференций</p>
             </div>
           </Link>
           {token ? (
@@ -76,6 +90,11 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
           <div className="flex items-center gap-3">
             {token ? (
               <>
+                {roleLabel ? (
+                  <span className="hidden rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs text-muted-foreground md:inline-flex">
+                    {roleLabel}
+                  </span>
+                ) : null}
                 <Button variant="outline" onClick={handleLogout}>
                   Выйти
                 </Button>

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL, fetchList, fetchOne } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type {
   Conference,
@@ -19,6 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 export function ConferenceDetailPage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isOrganizerRole = roleCode === "organizer";
   const [, params] = useRoute("/conferences/:id");
   const id = params?.id ? Number(params.id) : null;
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -334,9 +337,11 @@ export function ConferenceDetailPage() {
                 <div className="h-full w-[70%] rounded-full bg-primary" />
               </div>
             </div>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/conferences">Изменить в списке конференций</Link>
-            </Button>
+            {isOrganizerRole ? (
+              <Button className="w-full" variant="outline" asChild>
+                <Link href="/conferences">Изменить в списке конференций</Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -347,55 +352,59 @@ export function ConferenceDetailPage() {
             <CardTitle className="text-lg">Критерии оценки</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Критерий</Label>
-                <Input
-                  value={criteriaForm.name}
-                  onChange={event => setCriteriaForm(current => ({ ...current, name: event.target.value }))}
-                  placeholder="Название критерия"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Этап</Label>
-                <Select
-                  value={criteriaForm.stage}
-                  onValueChange={value => setCriteriaForm(current => ({ ...current, stage: value }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Этап" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="online">Заочный</SelectItem>
-                    <SelectItem value="offline">Очный</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Максимум баллов</Label>
-                <Input
-                  type="number"
-                  value={criteriaForm.maxScore}
-                  onChange={event =>
-                    setCriteriaForm(current => ({ ...current, maxScore: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Описание</Label>
-                <Textarea
-                  value={criteriaForm.description}
-                  onChange={event =>
-                    setCriteriaForm(current => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder="Краткое описание"
-                />
-              </div>
-            </div>
-            {criteriaMessage ? <p>{criteriaMessage}</p> : null}
-            <Button onClick={submitCriterion}>Добавить критерий</Button>
+            {isOrganizerRole ? (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Критерий</Label>
+                    <Input
+                      value={criteriaForm.name}
+                      onChange={event => setCriteriaForm(current => ({ ...current, name: event.target.value }))}
+                      placeholder="Название критерия"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Этап</Label>
+                    <Select
+                      value={criteriaForm.stage}
+                      onValueChange={value => setCriteriaForm(current => ({ ...current, stage: value }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Этап" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="online">Заочный</SelectItem>
+                        <SelectItem value="offline">Очный</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Максимум баллов</Label>
+                    <Input
+                      type="number"
+                      value={criteriaForm.maxScore}
+                      onChange={event =>
+                        setCriteriaForm(current => ({ ...current, maxScore: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Описание</Label>
+                    <Textarea
+                      value={criteriaForm.description}
+                      onChange={event =>
+                        setCriteriaForm(current => ({ ...current, description: event.target.value }))
+                      }
+                      placeholder="Краткое описание"
+                    />
+                  </div>
+                </div>
+                {criteriaMessage ? <p>{criteriaMessage}</p> : null}
+                <Button onClick={submitCriterion}>Добавить критерий</Button>
+              </>
+            ) : null}
             <div className="space-y-2">
               {criteria.length ? (
                 criteria.map(criterion => (
@@ -531,21 +540,23 @@ export function ConferenceDetailPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Результаты</h2>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={runCalculation}>
-              Рассчитать
-            </Button>
-            <Button variant="outline" onClick={() => downloadResults("csv")}>
-              Экспорт CSV
-            </Button>
-            <Button variant="outline" onClick={() => downloadResults("xlsx")}>
-              Экспорт Excel
-            </Button>
-            <Button variant="outline" onClick={openPrintProtocol}>
-              Печать протокола
-            </Button>
-            <Button onClick={publishResults}>Опубликовать</Button>
-          </div>
+          {isOrganizerRole ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={runCalculation}>
+                Рассчитать
+              </Button>
+              <Button variant="outline" onClick={() => downloadResults("csv")}>
+                Экспорт CSV
+              </Button>
+              <Button variant="outline" onClick={() => downloadResults("xlsx")}>
+                Экспорт Excel
+              </Button>
+              <Button variant="outline" onClick={openPrintProtocol}>
+                Печать протокола
+              </Button>
+              <Button onClick={publishResults}>Опубликовать</Button>
+            </div>
+          ) : null}
         </div>
         {resultMessage ? <p className="text-sm text-muted-foreground">{resultMessage}</p> : null}
         <div className="grid gap-4 md:grid-cols-2">

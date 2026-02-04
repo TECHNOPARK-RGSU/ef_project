@@ -4,11 +4,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { Comment, Project, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 
 export function CommentsPage() {
+  const authUser = getAuthUserInfo();
+  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const isOrganizerRole = roleCode === "organizer";
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -60,7 +63,9 @@ export function CommentsPage() {
       headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
       body: JSON.stringify({
         project_id: Number(form.projectId),
-        author_id: form.authorId === "none" ? null : Number(form.authorId),
+        author_id: isOrganizerRole
+          ? (form.authorId === "none" ? null : Number(form.authorId))
+          : (authUser?.id ?? null),
         text: form.text,
       }),
     });
@@ -140,22 +145,24 @@ export function CommentsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Автор</Label>
-            <Select value={form.authorId} onValueChange={value => setForm({ ...form, authorId: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Опционально" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Без автора</SelectItem>
-                {allowedAuthors.map(user => (
-                  <SelectItem key={user.id} value={String(user.id)}>
-                    {user.last_name} {user.first_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isOrganizerRole ? (
+            <div className="space-y-2">
+              <Label>Автор</Label>
+              <Select value={form.authorId} onValueChange={value => setForm({ ...form, authorId: value })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Опционально" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Без автора</SelectItem>
+                  {allowedAuthors.map(user => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.last_name} {user.first_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-2 md:col-span-3">
             <Label>Комментарий</Label>
             <Textarea
