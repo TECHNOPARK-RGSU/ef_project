@@ -23,8 +23,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-unsafe-change-me")
 
+def env_bool(name: str, default: str = "0") -> bool:
+    value = os.getenv(name, default)
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+DEBUG = env_bool("DJANGO_DEBUG", "1")
 
 ALLOWED_HOSTS = os.getenv(
     "DJANGO_ALLOWED_HOSTS",
@@ -52,7 +57,7 @@ INSTALLED_APPS = [
     "utils",
 ]
 
-MINIO_ENABLED = os.getenv("MINIO_ENABLED", "0") == "1"
+MINIO_ENABLED = env_bool("MINIO_ENABLED", "0")
 if MINIO_ENABLED:
     INSTALLED_APPS.append("storages")
 
@@ -166,14 +171,31 @@ if MINIO_ENABLED:
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_USE_SSL = MINIO_ENDPOINT.startswith("https")
-    AWS_S3_VERIFY = os.getenv("MINIO_VERIFY_SSL", "1") == "1"
+    AWS_S3_VERIFY = env_bool("MINIO_VERIFY_SSL", "1")
     if MINIO_PUBLIC_URL:
         parsed = urlparse(MINIO_PUBLIC_URL)
         domain = parsed.netloc or MINIO_PUBLIC_URL
         AWS_S3_CUSTOM_DOMAIN = f"{domain}/{AWS_STORAGE_BUCKET_NAME}"
         if parsed.scheme:
             AWS_S3_URL_PROTOCOL = f"{parsed.scheme}:"
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -196,7 +218,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "users.User"
 
-CORS_ALLOW_ALL_ORIGINS = os.getenv("DJANGO_CORS_ALLOW_ALL", "0") == "1"
+CORS_ALLOW_ALL_ORIGINS = env_bool("DJANGO_CORS_ALLOW_ALL", "0")
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
