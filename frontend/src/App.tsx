@@ -12,7 +12,7 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SectionsPage } from "@/pages/SectionsPage";
 import { ScoresPage } from "@/pages/ScoresPage";
-import { UsersPage } from "@/pages/UsersPage";
+import { UsersEditPage, UsersPage } from "@/pages/UsersPage";
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
@@ -106,7 +106,7 @@ export function App() {
     if (path === "/criteria") return canAccessCriteria;
     if (path === "/comments") return canAccessComments;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
-    if (path === "/sections" || path === "/roles" || path === "/users" || path === "/catalogs") {
+    if (path === "/sections" || path === "/roles" || path === "/users" || path.startsWith("/users/") || path === "/catalogs") {
       return canAccessAdminCatalogs;
     }
     return false;
@@ -146,6 +146,7 @@ export function App() {
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}
+          {canAccessAdminCatalogs ? <Route path="/users/:id" component={UsersEditPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
           {canAccessComments ? <Route path="/comments" component={CommentsPage} /> : null}
           <Route path="/login" component={LoginPage} />

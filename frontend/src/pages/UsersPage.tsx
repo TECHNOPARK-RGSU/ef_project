@@ -7,8 +7,18 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import type { EducationalOrganization, Role, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useRoute } from "wouter";
 
-export function UsersPage() {
+type UsersPageProps = {
+  initialEditingId?: number | null;
+  isEditPage?: boolean;
+};
+
+function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps) {
+  const [, setLocation] = useLocation();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [initialEditHandled, setInitialEditHandled] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [orgs, setOrgs] = useState<EducationalOrganization[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -94,6 +104,10 @@ export function UsersPage() {
     setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
     setEditingId(null);
     setMessage(editingId ? "Пользователь обновлен." : "Пользователь создан.");
+    setIsModalOpen(false);
+    if (isEditPage) {
+      setLocation("/users");
+    }
   };
 
   const startEdit = (user: User) => {
@@ -106,11 +120,17 @@ export function UsersPage() {
       roleId: user.role?.id ? String(user.role.id) : "",
       orgId: user.educational_organization?.id ? String(user.educational_organization.id) : "none",
     });
+    setIsModalOpen(true);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
+    setIsModalOpen(false);
+    setMessage(null);
+    if (isEditPage) {
+      setLocation("/users");
+    }
   };
 
   const deleteUser = async (id: number) => {
@@ -137,124 +157,216 @@ export function UsersPage() {
     return [...users].sort((a, b) => (a.last_name || "").localeCompare(b.last_name || ""));
   }, [users]);
 
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return sortedUsers;
+    const query = searchQuery.trim().toLowerCase();
+    return sortedUsers.filter(user => {
+      const parts = [
+        user.last_name,
+        user.first_name,
+        user.email,
+        user.role?.name,
+        user.educational_organization?.short_name,
+        user.educational_organization?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return parts.includes(query);
+    });
+  }, [searchQuery, sortedUsers]);
+
+  const groupedUsers = useMemo(() => {
+    return filteredUsers.reduce<Record<string, User[]>>((acc, user) => {
+      const key = user.role?.name || "Без роли";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(user);
+      return acc;
+    }, {});
+  }, [filteredUsers]);
+
+  useEffect(() => {
+    if (!initialEditingId || initialEditHandled) return;
+    if (!users.length) return;
+    const target = users.find(user => user.id === initialEditingId);
+    if (target) {
+      startEdit(target);
+      setInitialEditHandled(true);
+    } else {
+      setMessage("Пользователь для редактирования не найден.");
+      setInitialEditHandled(true);
+    }
+  }, [initialEditingId, initialEditHandled, users]);
+
+  const openCreateModal = () => {
+    setEditingId(null);
+    setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
+    setIsModalOpen(true);
+    setMessage(null);
+  };
+
+  const openEditModal = (user: User) => {
+    startEdit(user);
+    if (!isEditPage) {
+      setLocation(`/users/${user.id}`);
+    }
+  };
+
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">пользователи</p>
         <h1 className="text-3xl font-semibold">Управление пользователями</h1>
+        </div>
+        <Button onClick={openCreateModal}>Создать пользователя</Button>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование пользователя" : "Создать пользователя"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
-          <div className="space-y-2">
-            <Label>Фамилия</Label>
-            <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Имя</Label>
-            <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Пароль</Label>
-            <Input
-              type="password"
-              value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Роль</Label>
-            <Select
-              value={form.roleId || undefined}
-              onValueChange={value => setForm({ ...form, roleId: value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Выберите роль" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.length ? (
-                  roles.map(role => (
-                    <SelectItem key={role.id} value={String(role.id)}>
-                      {role.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="0" disabled>
-                    Нет ролей
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Организация</Label>
-            <Select value={form.orgId} onValueChange={value => setForm({ ...form, orgId: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Опционально" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Без организации</SelectItem>
-                {orgs.map(org => (
-                  <SelectItem key={org.id} value={String(org.id)}>
-                    {org.short_name || org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <div className="flex items-center gap-2">
+      <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Поиск пользователя</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="space-y-2">
+              <Label>Поиск</Label>
+              <Input
+                placeholder="Имя, email, роль или организация"
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+              />
+            </div>
+            <p>Найдено: {filteredUsers.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Список пользователей</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            {filteredUsers.length ? (
+              Object.entries(groupedUsers).map(([group, groupUsers]) => (
+                <div key={group} className="space-y-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{group}</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {groupUsers.map(user => (
+                      <div key={user.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
+                        <p className="font-semibold text-foreground">
+                          {user.last_name} {user.first_name}
+                        </p>
+                        <p>{user.email || "Email не указан"}</p>
+                        <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <Button size="sm" variant="secondary" onClick={() => openEditModal(user)}>
+                            Редактировать
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => deleteUser(user.id)}>
+                            Удалить
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>Пользователи не найдены.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl rounded-lg border border-border/60 bg-card p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {editingId ? "Редактирование пользователя" : "Создать пользователя"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                Закрыть
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
+              <div className="space-y-2">
+                <Label>Фамилия</Label>
+                <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Имя</Label>
+                <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Пароль</Label>
+                <Input
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Роль</Label>
+                <Select value={form.roleId || undefined} onValueChange={value => setForm({ ...form, roleId: value })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите роль" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.length ? (
+                      roles.map(role => (
+                        <SelectItem key={role.id} value={String(role.id)}>
+                          {role.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет ролей
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Организация</Label>
+                <Select value={form.orgId} onValueChange={value => setForm({ ...form, orgId: value })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Опционально" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Без организации</SelectItem>
+                    {orgs.map(org => (
+                      <SelectItem key={org.id} value={String(org.id)}>
+                        {org.short_name || org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {message ? <p className="mt-3 text-sm text-muted-foreground">{message}</p> : null}
+            <div className="mt-4 flex items-center gap-2">
               <Button onClick={submitUser}>{editingId ? "Сохранить" : "Создать"}</Button>
-              {editingId ? (
-                <Button variant="outline" onClick={cancelEdit}>
-                  Отмена
-                </Button>
-              ) : null}
+              <Button variant="outline" onClick={cancelEdit}>
+                Отмена
+              </Button>
             </div>
           </div>
-          {message ? <p className="col-span-full">{message}</p> : null}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {sortedUsers.length ? (
-          sortedUsers.map(user => (
-            <Card key={user.id} className="border-border/70 bg-card/80">
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {user.last_name} {user.first_name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-1">
-                <p>{user.email || "Email не указан"}</p>
-                <p>Роль: {user.role?.name || "Не назначена"}</p>
-                <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <Button size="sm" variant="secondary" onClick={() => startEdit(user)}>
-                    Редактировать
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteUser(user.id)}>
-                    Удалить
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <Card className="border-border/70 bg-card/80">
-            <CardContent className="p-6 text-sm text-muted-foreground">Пользователей пока нет.</CardContent>
-          </Card>
-        )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+export function UsersPage() {
+  return <UsersPageBase />;
+}
+
+export function UsersEditPage() {
+  const [, params] = useRoute("/users/:id");
+  const id = params?.id ? Number(params.id) : null;
+  return <UsersPageBase initialEditingId={id} isEditPage />;
 }
