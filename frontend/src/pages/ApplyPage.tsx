@@ -54,6 +54,7 @@ export function ApplyPage() {
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -275,6 +276,7 @@ export function ApplyPage() {
         fileInputRef.current.value = "";
       }
       setEditingId(null);
+      setIsProjectModalOpen(false);
     } catch (error) {
       setSubmitState("error");
       setSubmitMessage("Не удалось сохранить. Проверь API.");
@@ -300,6 +302,7 @@ export function ApplyPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setIsProjectModalOpen(true);
   };
 
   const cancelEdit = () => {
@@ -321,6 +324,30 @@ export function ApplyPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setIsProjectModalOpen(false);
+  };
+
+  const openCreateProject = () => {
+    setEditingId(null);
+    setForm({
+      title: "",
+      description: "",
+      additionalInfo: "",
+      leaderId: "",
+      tutorId: "none",
+      member1Id: "none",
+      member2Id: "none",
+      sectionId: "",
+      statusId: "",
+      stageId: "",
+      presentationTypeId: "",
+    });
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setSubmitMessage(null);
+    setIsProjectModalOpen(true);
   };
 
   const deleteProject = async (id: number) => {
@@ -403,16 +430,35 @@ export function ApplyPage() {
 
   return (
     <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
-      <Card className="border-border/70 bg-card/85">
-        <CardHeader>
-          <CardTitle className="text-2xl">
-            {editingId ? "Редактирование заявки" : "Новая заявка"}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {isOrganizerRole
-              ? "Заявка сохраняется сразу в системе как проект. Отдельной отправки не требуется."
-              : "Заполните только основные поля: название, секцию, формат и файл проекта."}
+      <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            {isOrganizerRole ? "проекты" : "заявки"}
           </p>
+          <h1 className="text-2xl font-semibold">
+            {isOrganizerRole ? "Управление проектами" : "Мои проекты"}
+          </h1>
+        </div>
+        <Button onClick={openCreateProject}>Создать проект</Button>
+      </div>
+
+      {isProjectModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-4xl border-border/70 bg-card/85">
+        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <CardTitle className="text-2xl">
+              {editingId ? "Редактирование заявки" : "Новая заявка"}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {isOrganizerRole
+                ? "Заявка сохраняется сразу в системе как проект. Отдельной отправки не требуется."
+                : "Заполните только основные поля: название, секцию, формат и файл проекта."}
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={cancelEdit}>
+            Закрыть
+          </Button>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
@@ -669,6 +715,8 @@ export function ApplyPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
+      ) : null}
 
       <div className="space-y-4">
         <Card className="border-border/70 bg-card/80">

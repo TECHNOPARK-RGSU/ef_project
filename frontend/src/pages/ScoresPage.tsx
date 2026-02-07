@@ -18,6 +18,7 @@ export function ScoresPage() {
   const [scores, setScores] = useState<ProjectScore[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [form, setForm] = useState({
     projectId: "",
     criterionId: "",
@@ -81,6 +82,7 @@ export function ScoresPage() {
     setForm({ projectId: "", criterionId: "", evaluatorId: "none", score: "" });
     setEditingId(null);
     setMessage(editingId ? "Оценка обновлена." : "Оценка сохранена.");
+    setIsScoreModalOpen(false);
   };
 
   const startEdit = (score: ProjectScore) => {
@@ -91,11 +93,20 @@ export function ScoresPage() {
       evaluatorId: score.evaluator?.id ? String(score.evaluator.id) : "none",
       score: String(score.score),
     });
+    setIsScoreModalOpen(true);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm({ projectId: "", criterionId: "", evaluatorId: "none", score: "" });
+    setIsScoreModalOpen(false);
+  };
+
+  const openCreateScore = () => {
+    setEditingId(null);
+    setForm({ projectId: "", criterionId: "", evaluatorId: "none", score: "" });
+    setMessage(null);
+    setIsScoreModalOpen(true);
   };
 
   const deleteScore = async (id: number) => {
@@ -120,16 +131,26 @@ export function ScoresPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">оценки</p>
-        <h1 className="text-3xl font-semibold">Оценки проектов</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">оценки</p>
+          <h1 className="text-3xl font-semibold">Оценки проектов</h1>
+        </div>
+        <Button onClick={openCreateScore}>Создать оценку</Button>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
+      {isScoreModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-3xl border-border/70 bg-card/80">
         <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование оценки" : "Новая оценка"}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">
+              {editingId ? "Редактирование оценки" : "Новая оценка"}
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              Закрыть
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
           <div className="space-y-2">
@@ -207,6 +228,8 @@ export function ScoresPage() {
           {message ? <p className="col-span-full">{message}</p> : null}
         </CardContent>
       </Card>
+      </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {scores.length ? (

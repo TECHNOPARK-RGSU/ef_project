@@ -15,6 +15,7 @@ export function CriteriaPage() {
   const [selectedConferenceId, setSelectedConferenceId] = useState<string>("all");
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
   const [form, setForm] = useState({
     conferenceId: "",
     name: "",
@@ -75,6 +76,7 @@ export function CriteriaPage() {
     setForm({ conferenceId: "", name: "", description: "", stage: "online", maxScore: "10" });
     setEditingId(null);
     setMessage(editingId ? "Критерий обновлен." : "Критерий создан.");
+    setIsCriteriaModalOpen(false);
   };
 
   const startEdit = (item: EvaluationCriterion) => {
@@ -86,11 +88,20 @@ export function CriteriaPage() {
       stage: item.stage,
       maxScore: String(item.max_score),
     });
+    setIsCriteriaModalOpen(true);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm({ conferenceId: "", name: "", description: "", stage: "online", maxScore: "10" });
+    setIsCriteriaModalOpen(false);
+  };
+
+  const openCreateCriterion = () => {
+    setEditingId(null);
+    setForm({ conferenceId: "", name: "", description: "", stage: "online", maxScore: "10" });
+    setMessage(null);
+    setIsCriteriaModalOpen(true);
   };
 
   const deleteCriterion = async (id: number) => {
@@ -115,16 +126,26 @@ export function CriteriaPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">критерии</p>
-        <h1 className="text-3xl font-semibold">Критерии оценки</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">критерии</p>
+          <h1 className="text-3xl font-semibold">Критерии оценки</h1>
+        </div>
+        <Button onClick={openCreateCriterion}>Создать критерий</Button>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
+      {isCriteriaModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-4xl border-border/70 bg-card/80">
         <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование критерия" : "Новый критерий"}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">
+              {editingId ? "Редактирование критерия" : "Новый критерий"}
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              Закрыть
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
           <div className="space-y-2">
@@ -189,6 +210,8 @@ export function CriteriaPage() {
           {message ? <p className="col-span-full">{message}</p> : null}
         </CardContent>
       </Card>
+      </div>
+      ) : null}
 
       <Card className="border-border/70 bg-card/80">
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

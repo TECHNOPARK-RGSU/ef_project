@@ -17,6 +17,7 @@ export function CommentsPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [form, setForm] = useState({
     projectId: "",
     authorId: "none",
@@ -80,6 +81,7 @@ export function CommentsPage() {
     setForm({ projectId: "", authorId: "none", text: "" });
     setEditingId(null);
     setMessage(editingId ? "Комментарий обновлен." : "Комментарий создан.");
+    setIsCommentModalOpen(false);
   };
 
   const startEdit = (item: Comment) => {
@@ -89,11 +91,20 @@ export function CommentsPage() {
       authorId: item.author?.id ? String(item.author.id) : "none",
       text: item.text,
     });
+    setIsCommentModalOpen(true);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm({ projectId: "", authorId: "none", text: "" });
+    setIsCommentModalOpen(false);
+  };
+
+  const openCreateComment = () => {
+    setEditingId(null);
+    setForm({ projectId: "", authorId: "none", text: "" });
+    setMessage(null);
+    setIsCommentModalOpen(true);
   };
 
   const deleteComment = async (id: number) => {
@@ -118,16 +129,26 @@ export function CommentsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">комментарии</p>
-        <h1 className="text-3xl font-semibold">Комментарии экспертов</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">комментарии</p>
+          <h1 className="text-3xl font-semibold">Комментарии экспертов</h1>
+        </div>
+        <Button onClick={openCreateComment}>Создать комментарий</Button>
       </div>
 
-      <Card className="border-border/70 bg-card/80">
+      {isCommentModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-3xl border-border/70 bg-card/80">
         <CardHeader>
-          <CardTitle className="text-lg">
-            {editingId ? "Редактирование комментария" : "Новый комментарий"}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">
+              {editingId ? "Редактирование комментария" : "Новый комментарий"}
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              Закрыть
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
           <div className="space-y-2">
@@ -182,6 +203,8 @@ export function CommentsPage() {
           {message ? <p className="col-span-full">{message}</p> : null}
         </CardContent>
       </Card>
+      </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {comments.length ? (
