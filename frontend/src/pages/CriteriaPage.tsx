@@ -16,6 +16,7 @@ export function CriteriaPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [form, setForm] = useState({
     conferenceId: "",
     name: "",
@@ -23,6 +24,18 @@ export function CriteriaPage() {
     stage: "online",
     maxScore: "10",
   });
+  const commonCriteriaNames = [
+    "Актуальность темы",
+    "Научная новизна",
+    "Практическая значимость",
+    "Качество исследования",
+    "Оформление работы",
+    "Презентация",
+    "Защита проекта",
+    "Ответы на вопросы",
+    "Методология",
+    "Результаты",
+  ];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,6 +54,23 @@ export function CriteriaPage() {
     if (selectedConferenceId === "all") return criteria;
     return criteria.filter(item => String(item.conference?.id) === selectedConferenceId);
   }, [criteria, selectedConferenceId]);
+
+  useEffect(() => {
+    if (!form.conferenceId) {
+      setSuggestions([]);
+      return;
+    }
+    const query = form.name.trim().toLowerCase();
+    const existing = filteredCriteria
+      .filter(item => String(item.conference?.id) === form.conferenceId)
+      .map(item => item.name.toLowerCase());
+    const base = commonCriteriaNames.filter(name => !existing.includes(name.toLowerCase()));
+    if (!query) {
+      setSuggestions(base.slice(0, 6));
+      return;
+    }
+    setSuggestions(base.filter(name => name.toLowerCase().includes(query)).slice(0, 6));
+  }, [form.conferenceId, form.name, filteredCriteria]);
 
   const submitCriterion = async () => {
     setMessage(null);
@@ -169,6 +199,21 @@ export function CriteriaPage() {
           <div className="space-y-2">
             <Label>Название</Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            {suggestions.length ? (
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {suggestions.map(suggestion => (
+                  <Button
+                    key={suggestion}
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => setForm(current => ({ ...current, name: suggestion }))}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Этап</Label>

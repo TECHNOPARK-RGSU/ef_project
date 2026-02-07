@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchList } from "@/lib/api";
+import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
 import { FEATURES, STEPS } from "@/lib/content";
 import { formatDateRange, formatFormat } from "@/lib/format";
@@ -27,6 +27,7 @@ const toTrackCards = (sections: Section[]) =>
 
 export function HomePage() {
   const authUser = getAuthUserInfo();
+  const isGuest = !authUser?.id;
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isStudentRole = roleCode === "student" || roleCode === "student2" || roleCode === "student3";
   const isTutorRole = roleCode === "tutor";
@@ -38,8 +39,20 @@ export function HomePage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [selectedConference, setSelectedConference] = useState<Conference | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [registerMessage, setRegisterMessage] = useState<string | null>(null);
+  const [registerForm, setRegisterForm] = useState({
+    lastName: "",
+    firstName: "",
+    middleName: "",
+    email: "",
+    password: "",
+    phone: "",
+    city: "",
+  });
 
   useEffect(() => {
+    if (isGuest) return;
     const controller = new AbortController();
 
     const load = async () => {
@@ -55,9 +68,10 @@ export function HomePage() {
 
     load();
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => {
+    if (isGuest) return;
     const controller = new AbortController();
     const loadMeta = async () => {
       setMetaState("loading");
@@ -74,7 +88,7 @@ export function HomePage() {
 
     loadMeta();
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
   const visibleConferences = useMemo(() => conferences, [conferences]);
   const visibleTracks = useMemo(() => toTrackCards(sections), [sections]);
@@ -92,6 +106,56 @@ export function HomePage() {
     { value: String(conferences.length), label: "Конференций" },
     { value: String(statuses.length), label: "Статусов проекта" },
   ];
+
+  const submitRegistration = async () => {
+    setRegisterMessage(null);
+    if (!registerForm.lastName.trim() || !registerForm.firstName.trim() || !registerForm.email.trim()) {
+      setRegisterMessage("Заполните фамилию, имя и email.");
+      return;
+    }
+    if (!registerForm.password.trim()) {
+      setRegisterMessage("Укажите пароль.");
+      return;
+    }
+    const response = await fetch(`${API_BASE_URL}/api/users/users/register/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        last_name: registerForm.lastName.trim(),
+        first_name: registerForm.firstName.trim(),
+        middle_name: registerForm.middleName.trim() || "",
+        email: registerForm.email.trim(),
+        password: registerForm.password,
+        phone: registerForm.phone.trim(),
+        city: registerForm.city.trim(),
+      }),
+    });
+    if (!response.ok) {
+      let details = "Не удалось зарегистрироваться.";
+      try {
+        const data = (await response.json()) as Record<string, string[] | string>;
+        const errors = Object.values(data)
+          .flatMap(value => (Array.isArray(value) ? value : [value]))
+          .filter(Boolean)
+          .join(" ");
+        if (errors) details = errors;
+      } catch {
+        // ignore
+      }
+      setRegisterMessage(details);
+      return;
+    }
+    setRegisterMessage("Учетная запись создана. Теперь войдите.");
+    setRegisterForm({
+      lastName: "",
+      firstName: "",
+      middleName: "",
+      email: "",
+      password: "",
+      phone: "",
+      city: "",
+    });
+  };
 
   if (isStudentRole || isTutorRole) {
     return (
@@ -174,6 +238,11 @@ export function HomePage() {
             <Button size="lg" variant="outline" asChild>
               <a href="#events">К событиям</a>
             </Button>
+            {isGuest ? (
+              <Button size="lg" variant="secondary" onClick={() => setIsRegisterModalOpen(true)}>
+                Регистрация
+              </Button>
+            ) : null}
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {stats.map(item => (
@@ -500,6 +569,85 @@ export function HomePage() {
           </Card>
         </div>
       </section>
+
+      {isGuest && isRegisterModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-xl border-border/70 bg-card/90">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl">Регистрация участника</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Роль будет установлена как «участник». После регистрации войдите в систему.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsRegisterModalOpen(false)}>
+                Закрыть
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Фамилия</Label>
+                  <Input
+                    value={registerForm.lastName}
+                    onChange={event => setRegisterForm(current => ({ ...current, lastName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Имя</Label>
+                  <Input
+                    value={registerForm.firstName}
+                    onChange={event => setRegisterForm(current => ({ ...current, firstName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Отчество</Label>
+                  <Input
+                    value={registerForm.middleName}
+                    onChange={event => setRegisterForm(current => ({ ...current, middleName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    value={registerForm.email}
+                    onChange={event => setRegisterForm(current => ({ ...current, email: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Пароль</Label>
+                  <Input
+                    type="password"
+                    value={registerForm.password}
+                    onChange={event => setRegisterForm(current => ({ ...current, password: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Телефон</Label>
+                  <Input
+                    value={registerForm.phone}
+                    onChange={event => setRegisterForm(current => ({ ...current, phone: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Город</Label>
+                  <Input
+                    value={registerForm.city}
+                    onChange={event => setRegisterForm(current => ({ ...current, city: event.target.value }))}
+                  />
+                </div>
+              </div>
+              {registerMessage ? <p>{registerMessage}</p> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={submitRegistration}>Создать аккаунт</Button>
+                <Button variant="outline" asChild>
+                  <Link href="/login">Уже есть аккаунт</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </>
   );
 }

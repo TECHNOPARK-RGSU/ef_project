@@ -29,6 +29,22 @@ export function ScoresPage() {
     () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "expert"),
     [users],
   );
+  const selectedProject = useMemo(() => {
+    if (!form.projectId) return null;
+    return projects.find(project => String(project.id) === form.projectId) ?? null;
+  }, [form.projectId, projects]);
+
+  const availableCriteria = useMemo(() => {
+    if (!selectedProject?.section?.conference?.id) return [];
+    const conferenceId = selectedProject.section.conference.id;
+    const unique = new Map<string, EvaluationCriterion>();
+    criteria.forEach(item => {
+      if (item.conference?.id !== conferenceId) return;
+      const key = `${item.name}-${item.stage}`;
+      if (!unique.has(key)) unique.set(key, item);
+    });
+    return Array.from(unique.values());
+  }, [criteria, selectedProject]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -173,21 +189,31 @@ export function ScoresPage() {
           </div>
           <div className="space-y-2">
             <Label>Критерий</Label>
-            <Select
-              value={form.criterionId || undefined}
-              onValueChange={value => setForm({ ...form, criterionId: value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Выберите критерий" />
-              </SelectTrigger>
-              <SelectContent>
-                {criteria.map(item => (
-                  <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!selectedProject ? (
+              <p className="text-xs text-muted-foreground">Сначала выберите проект</p>
+            ) : (
+              <Select
+                value={form.criterionId || undefined}
+                onValueChange={value => setForm({ ...form, criterionId: value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите критерий" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCriteria.length ? (
+                    availableCriteria.map(item => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="0" disabled>
+                      Нет критериев для этой работы
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           {isOrganizerRole ? (
             <div className="space-y-2">

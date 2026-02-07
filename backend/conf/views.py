@@ -486,8 +486,21 @@ class EvaluationCriterionViewSet(viewsets.ModelViewSet):
         if getattr(user, "is_superuser", False):
             return queryset
         role_code = getattr(user.role, "code", "").lower()
-        if role_code in {"organizer", "expert"}:
+        if role_code == "organizer":
             return queryset
+        if role_code == "expert":
+            expert_projects = Project.objects.filter(
+                expert_assignments__assignment__expert=user,
+                is_archived=False,
+            ).select_related("section__conference")
+            conference_ids = {
+                project.section.conference_id
+                for project in expert_projects
+                if project.section and project.section.conference_id
+            }
+            if conference_ids:
+                return queryset.filter(conference_id__in=conference_ids).distinct()
+            return queryset.none()
         return queryset.none()
 
 

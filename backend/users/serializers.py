@@ -98,3 +98,36 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class RegistrationSerializer(serializers.Serializer):
+    """Регистрация пользователя с ролью участника."""
+
+    last_name = serializers.CharField(max_length=150)
+    first_name = serializers.CharField(max_length=150)
+    middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=6)
+    phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    educational_organization_id = serializers.PrimaryKeyRelatedField(
+        queryset=EducationalOrganization.objects.all(),
+        source="educational_organization",
+        required=False,
+        allow_null=True,
+    )
+
+    def validate_email(self, value: str) -> str:
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Пользователь с таким email уже существует.")
+        return value
+
+    def create(self, validated_data):
+        role = Role.objects.filter(code__iexact="student").first()
+        if not role:
+            raise serializers.ValidationError("Роль участника не найдена.")
+        password = validated_data.pop("password")
+        user = User.objects.create(role=role, **validated_data)
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        return user

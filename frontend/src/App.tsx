@@ -113,7 +113,7 @@ export function App() {
   };
 
   useEffect(() => {
-    if (!token && location !== "/login") {
+    if (!token && location !== "/login" && location !== "/") {
       setLocation("/login");
       return;
     }
@@ -128,7 +128,9 @@ export function App() {
 
   return (
     <SiteLayout roleCode={roleCode}>
-      {!token ? (
+      {!token && location === "/" ? (
+        <HomePage />
+      ) : !token ? (
         <LoginPage />
       ) : authState === "loading" ? (
         <Card className="border-border/70 bg-card/80">

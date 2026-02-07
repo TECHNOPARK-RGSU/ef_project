@@ -32,6 +32,22 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
     roleId: "",
     orgId: "none",
   });
+  const normalizeRoleName = (role?: Role | null) => {
+    const code = (role?.code ?? "").toLowerCase();
+    if (code === "student" || code === "student2" || code === "student3") {
+      return "Ученик";
+    }
+    return role?.name || "Без роли";
+  };
+
+  const roleOptions = useMemo(() => {
+    const findByCode = (code: string) => roles.find(role => role.code.toLowerCase() === code);
+    const studentRole = findByCode("student") ?? findByCode("student2") ?? findByCode("student3");
+    const nonStudents = roles.filter(
+      role => !["student", "student2", "student3"].includes(role.code.toLowerCase()),
+    );
+    return studentRole ? [studentRole, ...nonStudents] : nonStudents;
+  }, [roles]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -165,7 +181,7 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
         user.last_name,
         user.first_name,
         user.email,
-        user.role?.name,
+        normalizeRoleName(user.role),
         user.educational_organization?.short_name,
         user.educational_organization?.name,
       ]
@@ -178,7 +194,7 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
 
   const groupedUsers = useMemo(() => {
     return filteredUsers.reduce<Record<string, User[]>>((acc, user) => {
-      const key = user.role?.name || "Без роли";
+      const key = normalizeRoleName(user.role);
       if (!acc[key]) acc[key] = [];
       acc[key].push(user);
       return acc;
@@ -256,6 +272,7 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
                           {user.last_name} {user.first_name}
                         </p>
                         <p>{user.email || "Email не указан"}</p>
+                        <p>Роль: {normalizeRoleName(user.role)}</p>
                         <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
                         <div className="flex flex-wrap gap-2 pt-2">
                           <Button size="sm" variant="secondary" onClick={() => openEditModal(user)}>
@@ -316,10 +333,10 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
                     <SelectValue placeholder="Выберите роль" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roles.length ? (
-                      roles.map(role => (
+                    {roleOptions.length ? (
+                      roleOptions.map(role => (
                         <SelectItem key={role.id} value={String(role.id)}>
-                          {role.name}
+                          {normalizeRoleName(role)}
                         </SelectItem>
                       ))
                     ) : (
