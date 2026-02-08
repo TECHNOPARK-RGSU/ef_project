@@ -25,7 +25,15 @@ function getNavItems(roleCode: string): NavItem[] {
   return [{ label: "Главная", href: "/" }];
 }
 
-export function SiteLayout({ children, roleCode = "" }: { children: React.ReactNode; roleCode?: string }) {
+export function SiteLayout({
+  children,
+  roleCode = "",
+  userLogin,
+}: {
+  children: React.ReactNode;
+  roleCode?: string;
+  userLogin?: string;
+}) {
   const [token, setToken] = useState(() => getAuthToken());
   const [location] = useLocation();
   const normalizedRole = normalizeRoleCode(roleCode);
@@ -40,6 +48,7 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
           : isStudentRole(normalizedRole)
             ? getRoleLabel({ code: normalizedRole, name: "Ученик" })
             : "";
+  const headerUserText = [roleLabel, userLogin].filter(Boolean).join(" • ");
 
   const handleLogout = () => {
     clearAuthToken();
@@ -79,9 +88,9 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
           <div className="flex items-center gap-3">
             {token ? (
               <>
-                {roleLabel ? (
+                {headerUserText ? (
                   <span className="hidden rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs text-muted-foreground md:inline-flex">
-                    {roleLabel}
+                    {headerUserText}
                   </span>
                 ) : null}
                 <Button variant="outline" onClick={handleLogout}>

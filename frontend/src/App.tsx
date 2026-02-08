@@ -53,12 +53,14 @@ export function App() {
         const data = (await response.json()) as {
           id: number;
           role?: { code?: string | null } | null;
+          email?: string | null;
           first_name?: string | null;
           last_name?: string | null;
         };
         const userInfo: AuthUserInfo = {
           id: data.id,
           roleCode: (data.role?.code ?? "").toLowerCase(),
+          email: data.email ?? undefined,
           firstName: data.first_name ?? undefined,
           lastName: data.last_name ?? undefined,
         };
@@ -123,7 +125,7 @@ export function App() {
   }, [authState, defaultPath, location, setLocation, token]);
 
   return (
-    <SiteLayout roleCode={roleCode}>
+    <SiteLayout roleCode={roleCode} userLogin={authUser?.email}>
       {!token ? (
         <Switch>
           <Route path="/" component={HomePage} />

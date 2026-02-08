@@ -1,8 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL } from "@/lib/api";
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
 
 export function HomePage() {
   const [publicStats, setPublicStats] = useState<{
@@ -71,14 +69,6 @@ export function HomePage() {
           <p className="max-w-xl text-lg text-muted-foreground">
             Для участников, наставников, экспертов и организаторов — единая платформа с понятными сценариями работы.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <Button size="lg" asChild>
-              <Link href="/login">Войти</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/register">Регистрация</Link>
-            </Button>
-          </div>
           <div className="grid gap-4 md:grid-cols-3">
             {stats.map(item => (
               <Card key={item.label} className="border-border/60 bg-card/80">

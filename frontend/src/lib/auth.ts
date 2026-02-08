@@ -4,6 +4,7 @@ export const AUTH_USER_KEY = "authUser";
 export type AuthUserInfo = {
   id: number;
   roleCode: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
 };
