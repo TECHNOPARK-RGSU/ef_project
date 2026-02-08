@@ -228,7 +228,7 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "DJANGO_CORS_ALLOWED_ORIGINS",
-        "https://projectaris.jkproduction.pro,http://localhost:26110",
+        "https://projectaris.ru,https://www.projectaris.ru,http://localhost:26110",
     ).split(",")
     if origin.strip()
 ]
@@ -237,7 +237,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "https://projectaris.jkproduction.pro,https://projectaris.jkproduction.pro:8000,http://localhost:26110",
+        "https://projectaris.ru,https://www.projectaris.ru,https://api.projectaris.ru,http://localhost:26110",
     ).split(",")
     if origin.strip()
 ]
