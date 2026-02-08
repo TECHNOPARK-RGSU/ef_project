@@ -12,6 +12,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ScoresPage } from "@/pages/ScoresPage";
+import { MyProjectsPage } from "@/pages/MyProjectsPage";
 import { TutorStudentsPage } from "@/pages/TutorStudentsPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -106,6 +107,7 @@ export function App() {
     if (path === "/" || path === "/login" || path === "/register") return true;
     if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
     if (path === "/assignments") return canAccessAssignments;
+    if (path === "/my-projects") return isStudent;
     if (path.match(/^\/conferences\/\d+\/edit$/)) return canAccessAdminCatalogs;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
     if (path === "/users" || path.startsWith("/users/")) return canAccessGlobalUsers;
@@ -150,6 +152,7 @@ export function App() {
         <Switch>
           <Route path="/" component={HomePage} />
           {isTutor ? <Route path="/my-students" component={TutorStudentsPage} /> : null}
+          {isStudent ? <Route path="/my-projects" component={MyProjectsPage} /> : null}
           {canAccessConferences ? <Route path="/conferences" component={ConferencesPage} /> : null}
           {canAccessAssignments ? <Route path="/assignments" component={AssignmentsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/conferences/:id/edit" component={ConferenceEditPage} /> : null}

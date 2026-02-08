@@ -32,6 +32,7 @@ function getNavItems(roleCode: string): NavItem[] {
     return [
       { label: "Главная", href: "/" },
       { label: "Конференции", href: "/conferences" },
+      { label: "Мои проекты", href: "/my-projects" },
     ];
   }
   return [{ label: "Главная", href: "/" }];
