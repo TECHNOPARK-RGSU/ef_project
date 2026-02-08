@@ -2,11 +2,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
 import { useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
 import { Link } from "wouter";
+
+const REGISTRATION_ROLES = [
+  { value: "student", label: "Ученик" },
+  { value: "tutor", label: "Наставник" },
+  { value: "expert", label: "Эксперт" },
+] as const;
 
 export function RegisterPage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -17,6 +24,7 @@ export function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    roleCode: "student",
     phone: "",
     city: "",
   });
@@ -52,6 +60,7 @@ export function RegisterPage() {
         middle_name: form.middleName.trim() || "",
         email: form.email.trim(),
         password: form.password,
+        role_code: form.roleCode,
         phone: form.phone.trim(),
         city: form.city.trim(),
       }),
@@ -79,6 +88,7 @@ export function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
+      roleCode: "student",
       phone: "",
       city: "",
     });
@@ -127,6 +137,24 @@ export function RegisterPage() {
                 value={form.email}
                 onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Роль</Label>
+              <Select
+                value={form.roleCode}
+                onValueChange={value => setForm(current => ({ ...current, roleCode: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите роль" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REGISTRATION_ROLES.map(r => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Пароль</Label>

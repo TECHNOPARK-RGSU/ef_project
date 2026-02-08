@@ -100,14 +100,22 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
 
+REGISTRATION_ALLOWED_ROLES = ("student", "tutor", "expert")
+
+
 class RegistrationSerializer(serializers.Serializer):
-    """Регистрация пользователя с ролью участника."""
+    """Регистрация пользователя с выбором роли: ученик, наставник, эксперт."""
 
     last_name = serializers.CharField(max_length=150)
     first_name = serializers.CharField(max_length=150)
     middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
+    role_code = serializers.ChoiceField(
+        choices=[(c, c) for c in REGISTRATION_ALLOWED_ROLES],
+        default="student",
+        required=False,
+    )
     phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
     city = serializers.CharField(max_length=255, required=False, allow_blank=True)
     educational_organization_id = serializers.PrimaryKeyRelatedField(
@@ -123,9 +131,10 @@ class RegistrationSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        role = Role.objects.filter(code__iexact="student").first()
-        if not role:
-            raise serializers.ValidationError("Роль участника не найдена.")
+        role_code = validated_data.pop("role_code", "student")
+        role = Role.objects.filter(code__iexact=role_code).first()
+        if not role or role_code.lower() not in REGISTRATION_ALLOWED_ROLES:
+            raise serializers.ValidationError("Недопустимая роль для регистрации.")
         password = validated_data.pop("password")
         user = User.objects.create(role=role, **validated_data)
         user.set_password(password)

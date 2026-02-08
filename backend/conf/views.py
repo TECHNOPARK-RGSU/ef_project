@@ -13,7 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import render
 from openpyxl import Workbook
 from utils.roles import is_student_role, normalize_role_code
@@ -599,6 +599,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=["is_archived"])
         return Response({"status": "archived"})
 
+    @action(detail=True, methods=["get"])
+    def download_file(self, request, pk=None):
+        """Скачать файл проекта. Доступно организатору и эксперту по своему назначению."""
+        project = self.get_object()
+        if not project.files:
+            return Response({"detail": "У проекта нет прикреплённого файла."}, status=404)
+        filename = os.path.basename(project.files.name)
+        response = FileResponse(
+            project.files.open("rb"),
+            as_attachment=True,
+            filename=filename or f"project-{project.id}.bin",
+        )
+        return response
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     """ViewSet для комментариев."""
@@ -824,9 +838,6 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Forbidden"}, status=403)
 
         items = assignment.items.select_related("project")
-        if not items.exists():
-            return Response({"detail": "No files to download."}, status=404)
-
         with tempfile.NamedTemporaryFile(suffix=".zip") as tmpfile:
             with zipfile.ZipFile(tmpfile, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for item in items:

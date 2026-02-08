@@ -1,6 +1,7 @@
 import { SiteLayout } from "@/components/site/Layout";
 import { ApplyPage } from "@/pages/ApplyPage";
 import { AssignmentsPage } from "@/pages/AssignmentsPage";
+import { CommentsPage } from "@/pages/CommentsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferenceEditPage } from "@/pages/ConferenceEditPage";
 import { ConferenceResultsPage } from "@/pages/ConferenceResultsPage";
@@ -102,6 +103,7 @@ export function App() {
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;
     if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
+    if (path === "/assignments") return canAccessAssignments;
     if (path.match(/^\/conferences\/\d+\/edit$/)) return canAccessAdminCatalogs;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
     if (path === "/users" || path.startsWith("/users/")) return canAccessGlobalUsers;
@@ -146,7 +148,9 @@ export function App() {
         <Switch>
           <Route path="/" component={HomePage} />
           {canAccessConferences ? <Route path="/conferences" component={ConferencesPage} /> : null}
+          {canAccessAssignments ? <Route path="/assignments" component={AssignmentsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/conferences/:id/edit" component={ConferenceEditPage} /> : null}
+          {canAccessConferences ? <Route path="/conferences/:id/comments" component={CommentsPage} /> : null}
           {canAccessConferences ? <Route path="/conferences/:id" component={ConferenceDetailPage} /> : null}
           {canAccessConferences && canAccessApply ? <Route path="/conferences/:id/projects" component={ApplyPage} /> : null}
           {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
