@@ -77,21 +77,23 @@ export function ApplyPage() {
     presentationTypeId: "",
   });
 
+  const conferenceQuery = conferenceIdFromRoute != null ? `?conference=${conferenceIdFromRoute}` : "";
+
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
       setState("loading");
       const requests = [
-        fetchList<ProjectStatus>("/api/conf/project-statuses/", controller.signal).then(setStatuses),
+        fetchList<ProjectStatus>(`/api/conf/project-statuses${conferenceQuery}`, controller.signal).then(setStatuses),
         fetchList<Section>("/api/conf/sections/", controller.signal).then(setSections),
         fetchList<Conference>("/api/conf/conferences/", controller.signal).then(setConferences),
-        fetchList<ParticipationStage>("/api/conf/participation-stages/", controller.signal).then(setStages),
-        fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(
+        fetchList<ParticipationStage>(`/api/conf/participation-stages${conferenceQuery}`, controller.signal).then(setStages),
+        fetchList<PresentationType>(`/api/conf/presentation-types${conferenceQuery}`, controller.signal).then(
           setPresentationTypes,
         ),
-        fetchList<ConferenceStageAvailability>("/api/conf/conference-stages/", controller.signal).then(
-          setStageItems,
-        ),
+        conferenceIdFromRoute != null
+          ? fetchList<ConferenceStageAvailability>(`/api/conf/conference-stages/?conference=${conferenceIdFromRoute}`, controller.signal).then(setStageItems)
+          : Promise.resolve([] as ConferenceStageAvailability[]).then(setStageItems),
         fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
         fetchList<Project>("/api/conf/projects/?include_archived=1", controller.signal).then(setProjects),
         fetchList<ProjectResult>("/api/conf/results/", controller.signal).then(setResults),
@@ -105,7 +107,7 @@ export function ApplyPage() {
 
     load();
     return () => controller.abort();
-  }, []);
+  }, [conferenceIdFromRoute]);
 
   const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(status => status.name), [statuses]);
   const stageAvailabilityByConference = useMemo(() => {

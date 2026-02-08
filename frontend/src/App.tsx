@@ -1,7 +1,6 @@
 import { SiteLayout } from "@/components/site/Layout";
 import { ApplyPage } from "@/pages/ApplyPage";
 import { AssignmentsPage } from "@/pages/AssignmentsPage";
-import { CatalogsPage } from "@/pages/CatalogsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferenceEditPage } from "@/pages/ConferenceEditPage";
 import { ConferenceResultsPage } from "@/pages/ConferenceResultsPage";
@@ -11,8 +10,6 @@ import { ContactsPage, DocumentsPage, PolicyPage } from "@/pages/InfoPages";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RegisterPage } from "@/pages/RegisterPage";
-import { RolesPage } from "@/pages/RolesPage";
-import { SectionsPage } from "@/pages/SectionsPage";
 import { ScoresPage } from "@/pages/ScoresPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -98,6 +95,7 @@ export function App() {
   const canAccessScores = isOrganizer || isExpert;
   const canAccessAdminCatalogs = isOrganizer;
   const canAccessGlobalUsers = false;
+  const canAccessCatalogs = false;
 
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;
@@ -105,7 +103,7 @@ export function App() {
     if (path.match(/^\/conferences\/\d+\/edit$/)) return canAccessAdminCatalogs;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
     if (path === "/users" || path.startsWith("/users/")) return canAccessGlobalUsers;
-    if (path === "/sections" || path === "/roles" || path === "/catalogs") return canAccessAdminCatalogs;
+    if (path === "/sections" || path === "/roles" || path === "/catalogs") return canAccessCatalogs;
     return false;
   };
 
@@ -152,11 +150,8 @@ export function App() {
           {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
           {canAccessConferences && canAccessScores ? <Route path="/conferences/:id/scores" component={ScoresPage} /> : null}
           {canAccessConferences ? <Route path="/conferences/:id/results" component={ConferenceResultsPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessGlobalUsers ? <Route path="/users" component={UsersPage} /> : null}
           {canAccessGlobalUsers ? <Route path="/users/:id" component={UserDetailPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
           <Route path="/policy" component={PolicyPage} />
           <Route path="/contacts" component={ContactsPage} />
           <Route path="/documents" component={DocumentsPage} />

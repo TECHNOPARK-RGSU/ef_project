@@ -25,10 +25,19 @@ from users.models import User
 class PlaceSerializer(serializers.ModelSerializer):
     """Сериализатор для места."""
 
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = Place
         fields = [
             "id",
+            "conference_id",
             "name",
             "address",
             "created_at",
@@ -91,10 +100,19 @@ class ConferenceSerializer(serializers.ModelSerializer):
 class AgeCategorySerializer(serializers.ModelSerializer):
     """Сериализатор для возрастной категории."""
 
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = AgeCategory
         fields = [
             "id",
+            "conference_id",
             "name",
             "min_age",
             "max_age",
@@ -155,10 +173,19 @@ class SectionSerializer(serializers.ModelSerializer):
 class ProjectStatusSerializer(serializers.ModelSerializer):
     """Сериализатор для статуса проекта."""
 
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = ProjectStatus
         fields = [
             "id",
+            "conference_id",
             "name",
             "code",
             "created_at",
@@ -171,10 +198,19 @@ class ProjectStatusSerializer(serializers.ModelSerializer):
 class ParticipationStageSerializer(serializers.ModelSerializer):
     """Сериализатор для этапа участия."""
 
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = ParticipationStage
         fields = [
             "id",
+            "conference_id",
             "name",
             "code",
             "created_at",
@@ -250,6 +286,13 @@ class ConferenceStageAvailabilitySerializer(serializers.ModelSerializer):
 class PresentationTypeSerializer(serializers.ModelSerializer):
     """Сериализатор для типа представления."""
 
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     place = PlaceSerializer(read_only=True)
     place_id = serializers.PrimaryKeyRelatedField(
         queryset=Place.objects.all(),
@@ -261,6 +304,7 @@ class PresentationTypeSerializer(serializers.ModelSerializer):
         model = PresentationType
         fields = [
             "id",
+            "conference_id",
             "name",
             "code",
             "place",

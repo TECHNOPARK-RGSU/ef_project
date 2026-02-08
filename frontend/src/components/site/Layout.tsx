@@ -13,7 +13,6 @@ function getNavItems(roleCode: string): NavItem[] {
     return [
       { label: "Главная", href: "/" },
       { label: "Конференции", href: "/conferences" },
-      { label: "Справочники", href: "/catalogs" },
     ];
   }
   if (normalizedRole === "expert" || normalizedRole === "tutor" || isStudentRole(normalizedRole)) {

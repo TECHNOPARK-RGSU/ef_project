@@ -74,11 +74,18 @@ class Conference(BaseModel):
 
 
 class AgeCategory(BaseModel):
-    """Возрастная категория участников."""
+    """Возрастная категория участников (привязана к конференции)."""
 
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="age_categories",
+        verbose_name="Конференция",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(
         max_length=100,
-        unique=True,
         verbose_name="Название категории",
     )
     min_age = models.PositiveIntegerField(
@@ -96,6 +103,12 @@ class AgeCategory(BaseModel):
         verbose_name = "Возрастная категория"
         verbose_name_plural = "Возрастные категории"
         ordering = ["min_age", "max_age"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "name"],
+                name="unique_agecategory_conf_name",
+            )
+        ]
 
     def clean(self):
         if self.min_age is not None and self.max_age is not None:
@@ -134,16 +147,22 @@ class Section(BaseModel):
 
 
 class ProjectStatus(BaseModel):
-    """Статус проекта (согласован, не согласован, на доработку, новый и т.п.)."""
+    """Статус проекта (привязан к конференции)."""
 
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="project_statuses",
+        verbose_name="Конференция",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(
         max_length=100,
-        unique=True,
         verbose_name="Название статуса",
     )
     code = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name="Код статуса",
     )
 
@@ -151,19 +170,31 @@ class ProjectStatus(BaseModel):
         verbose_name = "Статус проекта"
         verbose_name_plural = "Статусы проекта"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "code"],
+                name="unique_projectstatus_conf_code",
+            )
+        ]
 
 
 class ParticipationStage(BaseModel):
-    """Этап участия (отборочный, заключительный, призёр, победитель, дисквалифицирован и т.п.)."""
+    """Этап участия (привязан к конференции)."""
 
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="participation_stages",
+        verbose_name="Конференция",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(
         max_length=100,
-        unique=True,
         verbose_name="Название этапа",
     )
     code = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name="Код этапа",
     )
 
@@ -171,6 +202,12 @@ class ParticipationStage(BaseModel):
         verbose_name = "Этап участия"
         verbose_name_plural = "Этапы участия"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "code"],
+                name="unique_participationstage_conf_code",
+            )
+        ]
 
 
 class ConferenceStatusFlowItem(BaseModel):
@@ -232,16 +269,24 @@ class ConferenceStageAvailability(BaseModel):
 
 
 class Place(BaseModel):
-    """Место проведения."""
+    """Место проведения (привязано к конференции)."""
 
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="places",
+        verbose_name="Конференция",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(
         max_length=225,
-        verbose_name="Имя"
+        verbose_name="Имя",
     )
-
     address = models.CharField(
         max_length=300,
-        verbose_name="Адрес"
+        verbose_name="Адрес",
+        blank=True,
     )
 
     class Meta:
@@ -251,21 +296,24 @@ class Place(BaseModel):
 
 
 class PresentationType(BaseModel):
-    """Тип представления проекта (устный, стендовый, онлайн и т.п.)."""
+    """Тип представления проекта (привязан к конференции)."""
 
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="presentation_types",
+        verbose_name="Конференция",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(
         max_length=100,
-        unique=True,
         verbose_name="Тип представления",
     )
     code = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name="Код типа",
     )
-
-    #Foreign Keys
-
     place = models.ForeignKey(
         Place,
         on_delete=models.PROTECT,
@@ -277,6 +325,12 @@ class PresentationType(BaseModel):
         verbose_name = "Тип представления"
         verbose_name_plural = "Типы представления"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conference", "code"],
+                name="unique_presentationtype_conf_code",
+            )
+        ]
 
 
 class Project(BaseModel):

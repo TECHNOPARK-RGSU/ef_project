@@ -11,6 +11,10 @@ import type {
   Conference,
   ConferenceExpert,
   EvaluationCriterion,
+  ParticipationStage,
+  Place,
+  PresentationType,
+  ProjectStatus,
   Section,
   User,
 } from "@/lib/types";
@@ -31,6 +35,10 @@ export function ConferenceEditPage() {
   const [conferenceExperts, setConferenceExperts] = useState<ConferenceExpert[]>([]);
   const [expertUsers, setExpertUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<AgeCategory[]>([]);
+  const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
+  const [stages, setStages] = useState<ParticipationStage[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
 
   const [form, setForm] = useState({
     title: "",
@@ -68,6 +76,10 @@ export function ConferenceEditPage() {
   const [editingExpertId, setEditingExpertId] = useState<number | null>(null);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
   const [expertsPage, setExpertsPage] = useState(1);
+
+  const [catalogModalType, setCatalogModalType] = useState<"age" | "status" | "stage" | "place" | "presentation" | null>(null);
+  const [catalogForm, setCatalogForm] = useState({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" });
+  const [catalogMessage, setCatalogMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -108,13 +120,21 @@ export function ConferenceEditPage() {
         fetchList<EvaluationCriterion>(`/api/conf/criteria/?conference=${id}`, controller.signal),
         fetchList<ConferenceExpert>(`/api/conf/conference-experts/?conference=${id}`, controller.signal),
         fetchList<User>(`/api/users/users/`, controller.signal),
-        fetchList<AgeCategory>("/api/conf/age-categories/", controller.signal),
+        fetchList<AgeCategory>(`/api/conf/age-categories/?conference=${id}`, controller.signal),
+        fetchList<ProjectStatus>(`/api/conf/project-statuses/?conference=${id}`, controller.signal),
+        fetchList<ParticipationStage>(`/api/conf/participation-stages/?conference=${id}`, controller.signal),
+        fetchList<Place>(`/api/conf/places/?conference=${id}`, controller.signal),
+        fetchList<PresentationType>(`/api/conf/presentation-types/?conference=${id}`, controller.signal),
       ]);
       if (controller.signal.aborted) return;
       if (tasks[0].status === "fulfilled") setCriteria(tasks[0].value);
       if (tasks[1].status === "fulfilled") setConferenceExperts(tasks[1].value);
       if (tasks[2].status === "fulfilled") setExpertUsers(tasks[2].value);
       if (tasks[3].status === "fulfilled") setCategories(tasks[3].value);
+      if (tasks[4].status === "fulfilled") setStatuses(tasks[4].value);
+      if (tasks[5].status === "fulfilled") setStages(tasks[5].value);
+      if (tasks[6].status === "fulfilled") setPlaces(tasks[6].value);
+      if (tasks[7].status === "fulfilled") setPresentationTypes(tasks[7].value);
     };
     loadMeta();
     return () => controller.abort();
@@ -290,6 +310,80 @@ export function ConferenceEditPage() {
     setConferenceExperts(prev => prev.filter(e => e.id !== itemId));
   };
 
+  const submitCatalogItem = async () => {
+    setCatalogMessage(null);
+    if (!id) return;
+    const token = getAuthToken();
+    if (!token) {
+      setCatalogMessage("Нужен токен.");
+      return;
+    }
+    const type = catalogModalType;
+    if (!type) return;
+    let url = "";
+    let body: Record<string, unknown> = { conference_id: id };
+    if (type === "age") {
+      if (!catalogForm.name.trim()) {
+        setCatalogMessage("Введите название.");
+        return;
+      }
+      url = "/api/conf/age-categories/";
+      body.name = catalogForm.name.trim();
+      if (catalogForm.minAge) body.min_age = Number(catalogForm.minAge);
+      if (catalogForm.maxAge) body.max_age = Number(catalogForm.maxAge);
+    } else if (type === "status") {
+      if (!catalogForm.name.trim() || !catalogForm.code.trim()) {
+        setCatalogMessage("Название и код обязательны.");
+        return;
+      }
+      url = "/api/conf/project-statuses/";
+      body.name = catalogForm.name.trim();
+      body.code = catalogForm.code.trim();
+    } else if (type === "stage") {
+      if (!catalogForm.name.trim() || !catalogForm.code.trim()) {
+        setCatalogMessage("Название и код обязательны.");
+        return;
+      }
+      url = "/api/conf/participation-stages/";
+      body.name = catalogForm.name.trim();
+      body.code = catalogForm.code.trim();
+    } else if (type === "place") {
+      if (!catalogForm.name.trim()) {
+        setCatalogMessage("Введите название.");
+        return;
+      }
+      url = "/api/conf/places/";
+      body.name = catalogForm.name.trim();
+      body.address = catalogForm.address.trim() || "";
+    } else if (type === "presentation") {
+      if (!catalogForm.name.trim() || !catalogForm.code.trim() || !catalogForm.placeId) {
+        setCatalogMessage("Название, код и место обязательны.");
+        return;
+      }
+      url = "/api/conf/presentation-types/";
+      body.name = catalogForm.name.trim();
+      body.code = catalogForm.code.trim();
+      body.place_id = Number(catalogForm.placeId);
+    }
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      setCatalogMessage("Не удалось сохранить.");
+      return;
+    }
+    const created = await response.json();
+    if (type === "age") setCategories(prev => [...prev, created]);
+    if (type === "status") setStatuses(prev => [...prev, created]);
+    if (type === "stage") setStages(prev => [...prev, created]);
+    if (type === "place") setPlaces(prev => [...prev, created]);
+    if (type === "presentation") setPresentationTypes(prev => [...prev, created]);
+    setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" });
+    setCatalogModalType(null);
+  };
+
   if (!id) {
     return (
       <Card className="border-border/70 bg-card/80">
@@ -444,6 +538,62 @@ export function ConferenceEditPage() {
       </Card>
 
       <Card className="border-border/70 bg-card/80">
+        <CardHeader>
+          <CardTitle className="text-lg">Справочники конференции</CardTitle>
+          <p className="text-sm text-muted-foreground">Возрастные категории, статусы заявок, этапы, места и типы представления только для этой конференции.</p>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="font-medium text-muted-foreground mb-1">Возрастные категории</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {categories.map(c => (
+                  <span key={c.id} className="rounded-md border border-border/60 bg-background/70 px-2 py-1 text-xs">{c.name}</span>
+                ))}
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setCatalogModalType("age"); setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" }); setCatalogMessage(null); }}>+</Button>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground mb-1">Статусы заявок</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {statuses.map(s => (
+                  <span key={s.id} className="rounded-md border border-border/60 bg-background/70 px-2 py-1 text-xs">{s.name}</span>
+                ))}
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setCatalogModalType("status"); setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" }); setCatalogMessage(null); }}>+</Button>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground mb-1">Этапы участия</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {stages.map(s => (
+                  <span key={s.id} className="rounded-md border border-border/60 bg-background/70 px-2 py-1 text-xs">{s.name}</span>
+                ))}
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setCatalogModalType("stage"); setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" }); setCatalogMessage(null); }}>+</Button>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground mb-1">Места</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {places.map(p => (
+                  <span key={p.id} className="rounded-md border border-border/60 bg-background/70 px-2 py-1 text-xs">{p.name}</span>
+                ))}
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setCatalogModalType("place"); setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: "" }); setCatalogMessage(null); }}>+</Button>
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <p className="font-medium text-muted-foreground mb-1">Типы представления</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {presentationTypes.map(p => (
+                  <span key={p.id} className="rounded-md border border-border/60 bg-background/70 px-2 py-1 text-xs">{p.name}</span>
+                ))}
+                <Button size="sm" variant="outline" className="h-7" onClick={() => { setCatalogModalType("presentation"); setCatalogForm({ name: "", code: "", minAge: "", maxAge: "", address: "", placeId: places[0]?.id ? String(places[0].id) : "" }); setCatalogMessage(null); }}>+</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70 bg-card/80">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-lg">Эксперты</CardTitle>
           <Button size="sm" onClick={() => { setEditingExpertId(null); setExpertForm({ expertId: "", sectionIds: [] }); setIsExpertModalOpen(true); }}>
@@ -591,6 +741,73 @@ export function ConferenceEditPage() {
               <div className="flex gap-2">
                 <Button onClick={saveExpert} disabled={!expertForm.expertId}>{editingExpertId ? "Сохранить" : "Добавить"}</Button>
                 <Button variant="outline" onClick={() => setIsExpertModalOpen(false)}>Отмена</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {catalogModalType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card/95">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <CardTitle className="text-lg">
+                {catalogModalType === "age" && "Возрастная категория"}
+                {catalogModalType === "status" && "Статус заявки"}
+                {catalogModalType === "stage" && "Этап участия"}
+                {catalogModalType === "place" && "Место"}
+                {catalogModalType === "presentation" && "Тип представления"}
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => { setCatalogModalType(null); setCatalogMessage(null); }}>Закрыть</Button>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {(catalogModalType === "age" || catalogModalType === "status" || catalogModalType === "stage" || catalogModalType === "place" || catalogModalType === "presentation") && (
+                <div className="space-y-2">
+                  <Label>Название</Label>
+                  <Input value={catalogForm.name} onChange={e => setCatalogForm(f => ({ ...f, name: e.target.value }))} placeholder="Название" />
+                </div>
+              )}
+              {(catalogModalType === "status" || catalogModalType === "stage" || catalogModalType === "presentation") && (
+                <div className="space-y-2">
+                  <Label>Код</Label>
+                  <Input value={catalogForm.code} onChange={e => setCatalogForm(f => ({ ...f, code: e.target.value }))} placeholder="code" />
+                </div>
+              )}
+              {catalogModalType === "age" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>Мин. возраст</Label>
+                    <Input type="number" value={catalogForm.minAge} onChange={e => setCatalogForm(f => ({ ...f, minAge: e.target.value }))} placeholder="0" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Макс. возраст</Label>
+                    <Input type="number" value={catalogForm.maxAge} onChange={e => setCatalogForm(f => ({ ...f, maxAge: e.target.value }))} placeholder="18" />
+                  </div>
+                </div>
+              )}
+              {catalogModalType === "place" && (
+                <div className="space-y-2">
+                  <Label>Адрес</Label>
+                  <Input value={catalogForm.address} onChange={e => setCatalogForm(f => ({ ...f, address: e.target.value }))} placeholder="Адрес (необязательно)" />
+                </div>
+              )}
+              {catalogModalType === "presentation" && (
+                <div className="space-y-2">
+                  <Label>Место</Label>
+                  <Select value={catalogForm.placeId || undefined} onValueChange={v => setCatalogForm(f => ({ ...f, placeId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Выберите место" /></SelectTrigger>
+                    <SelectContent>
+                      {places.map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {catalogMessage && <p className="text-destructive text-xs">{catalogMessage}</p>}
+              <div className="flex gap-2">
+                <Button onClick={submitCatalogItem}>Добавить</Button>
+                <Button variant="outline" onClick={() => { setCatalogModalType(null); setCatalogMessage(null); }}>Отмена</Button>
               </div>
             </CardContent>
           </Card>

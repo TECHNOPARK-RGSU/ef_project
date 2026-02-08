@@ -62,7 +62,7 @@ from users.models import User
 
 
 class PlaceViewSet(viewsets.ModelViewSet):
-    """ViewSet для мест."""
+    """ViewSet для мест (привязаны к конференции)."""
 
     queryset = Place.objects.filter(is_archived=False)
     serializer_class = PlaceSerializer
@@ -78,6 +78,13 @@ class PlaceViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "address"]
     ordering_fields = ["name", "created_at"]
     ordering = ["created_at"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        cid = self.request.query_params.get("conference")
+        if cid:
+            qs = qs.filter(Q(conference_id=cid) | Q(conference__isnull=True))
+        return qs
 
 
 class ConferenceViewSet(viewsets.ModelViewSet):
@@ -296,7 +303,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
 
 
 class AgeCategoryViewSet(viewsets.ModelViewSet):
-    """ViewSet для возрастных категорий."""
+    """ViewSet для возрастных категорий (привязаны к конференции)."""
 
     queryset = AgeCategory.objects.filter(is_archived=False)
     serializer_class = AgeCategorySerializer
@@ -312,6 +319,13 @@ class AgeCategoryViewSet(viewsets.ModelViewSet):
     search_fields = ["name"]
     ordering_fields = ["name", "min_age", "max_age", "created_at"]
     ordering = ["min_age", "max_age"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        cid = self.request.query_params.get("conference")
+        if cid:
+            qs = qs.filter(Q(conference_id=cid) | Q(conference__isnull=True))
+        return qs
 
 
 class SectionViewSet(viewsets.ModelViewSet):
@@ -334,7 +348,7 @@ class SectionViewSet(viewsets.ModelViewSet):
 
 
 class ProjectStatusViewSet(viewsets.ModelViewSet):
-    """ViewSet для статусов проекта."""
+    """ViewSet для статусов проекта (привязаны к конференции)."""
 
     queryset = ProjectStatus.objects.filter(is_archived=False)
     serializer_class = ProjectStatusSerializer
@@ -351,9 +365,26 @@ class ProjectStatusViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        cid = self.request.query_params.get("conference")
+        if cid:
+            qs = qs.filter(Q(conference_id=cid) | Q(conference__isnull=True))
+        return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        if instance.conference_id:
+            order = ConferenceStatusFlowItem.objects.filter(conference_id=instance.conference_id).count()
+            ConferenceStatusFlowItem.objects.get_or_create(
+                conference_id=instance.conference_id,
+                status=instance,
+                defaults={"order": order, "is_enabled": True},
+            )
+
 
 class ParticipationStageViewSet(viewsets.ModelViewSet):
-    """ViewSet для этапов участия."""
+    """ViewSet для этапов участия (привязаны к конференции)."""
 
     queryset = ParticipationStage.objects.filter(is_archived=False)
     serializer_class = ParticipationStageSerializer
@@ -369,6 +400,22 @@ class ParticipationStageViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "code"]
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        cid = self.request.query_params.get("conference")
+        if cid:
+            qs = qs.filter(Q(conference_id=cid) | Q(conference__isnull=True))
+        return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        if instance.conference_id:
+            ConferenceStageAvailability.objects.get_or_create(
+                conference_id=instance.conference_id,
+                stage=instance,
+                defaults={"is_enabled": True},
+            )
 
 
 class ConferenceStatusFlowItemViewSet(viewsets.ModelViewSet):
@@ -396,7 +443,9 @@ class ConferenceStatusFlowItemViewSet(viewsets.ModelViewSet):
         if conference_id:
             conference = Conference.objects.filter(id=conference_id).first()
             if conference and not queryset.filter(conference=conference).exists():
-                statuses = ProjectStatus.objects.filter(is_archived=False).order_by("name")
+                statuses = ProjectStatus.objects.filter(
+                    is_archived=False
+                ).filter(Q(conference_id=conference_id) | Q(conference__isnull=True)).order_by("name")
                 ConferenceStatusFlowItem.objects.bulk_create(
                     [
                         ConferenceStatusFlowItem(conference=conference, status=status, order=index)
@@ -432,7 +481,9 @@ class ConferenceStageAvailabilityViewSet(viewsets.ModelViewSet):
         if conference_id:
             conference = Conference.objects.filter(id=conference_id).first()
             if conference and not queryset.filter(conference=conference).exists():
-                stages = ParticipationStage.objects.filter(is_archived=False).order_by("name")
+                stages = ParticipationStage.objects.filter(
+                    is_archived=False
+                ).filter(Q(conference_id=conference_id) | Q(conference__isnull=True)).order_by("name")
                 ConferenceStageAvailability.objects.bulk_create(
                     [
                         ConferenceStageAvailability(conference=conference, stage=stage, is_enabled=True)
@@ -470,7 +521,7 @@ class ConferenceExpertViewSet(viewsets.ModelViewSet):
 
 
 class PresentationTypeViewSet(viewsets.ModelViewSet):
-    """ViewSet для типов представления."""
+    """ViewSet для типов представления (привязаны к конференции)."""
 
     queryset = PresentationType.objects.filter(is_archived=False)
     serializer_class = PresentationTypeSerializer
@@ -486,6 +537,13 @@ class PresentationTypeViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "code"]
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        cid = self.request.query_params.get("conference")
+        if cid:
+            qs = qs.filter(Q(conference_id=cid) | Q(conference__isnull=True))
+        return qs
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
