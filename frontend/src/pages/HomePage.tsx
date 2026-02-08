@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { API_BASE_URL, fetchList } from "@/lib/api";
+import { fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type { Conference, Section } from "@/lib/types";
@@ -16,33 +14,61 @@ export function HomePage() {
   const isStudentRole = isStudentRoleCode(roleCode);
   const isTutorRole = roleCode === "tutor";
   const isExpertRole = roleCode === "expert";
-  const [apiState, setApiState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [registerMessage, setRegisterMessage] = useState<string | null>(null);
-  const [registerForm, setRegisterForm] = useState({
-    lastName: "",
-    firstName: "",
-    middleName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-    city: "",
-  });
+  const roleContext =
+    isStudentRole || isTutorRole
+      ? {
+          label: isTutorRole ? "Наставник" : "Участник",
+          title: isTutorRole ? "Работа с проектами" : "Мои заявки",
+          description: isTutorRole
+            ? "Добавляйте и редактируйте проекты учеников."
+            : "Создавайте и обновляйте проекты в личном кабинете.",
+          actions: [{ label: "Открыть проекты", href: "/apply" }],
+          primaryHref: "/apply",
+          primaryLabel: "Мои проекты",
+        }
+      : isExpertRole
+        ? {
+            label: "Эксперт",
+            title: "Проверка работ",
+            description: "Скачивайте работы и выставляйте оценки по критериям.",
+            actions: [
+              { label: "Назначения", href: "/assignments" },
+              { label: "Оценки", href: "/scores" },
+              { label: "Комментарии", href: "/comments" },
+            ],
+            primaryHref: "/assignments",
+            primaryLabel: "Мои назначения",
+          }
+        : roleCode === "organizer"
+          ? {
+              label: "Организатор",
+              title: "Рабочая панель",
+              description: "Управляйте конференциями, секциями и пользователями.",
+              actions: [
+                { label: "Конференции", href: "/conferences" },
+                { label: "Секции", href: "/sections" },
+                { label: "Пользователи", href: "/users" },
+                { label: "Критерии", href: "/criteria" },
+                { label: "Назначения", href: "/assignments" },
+                { label: "Оценки", href: "/scores" },
+              ],
+              primaryHref: "/conferences",
+              primaryLabel: "Конференции",
+            }
+          : null;
 
   useEffect(() => {
     if (isGuest) return;
     const controller = new AbortController();
 
     const load = async () => {
-      setApiState("loading");
       try {
         const items = await fetchList<Conference>("/api/conf/conferences/", controller.signal);
         setConferences(items.slice(0, 6));
-        setApiState("ready");
       } catch (error) {
-        if (!controller.signal.aborted) setApiState("error");
+        if (!controller.signal.aborted) setConferences([]);
       }
     };
 
@@ -77,182 +103,6 @@ export function HomePage() {
         { value: String(sections.length), label: "Секций" },
       ];
 
-  const submitRegistration = async () => {
-    setRegisterMessage(null);
-    if (!registerForm.lastName.trim() || !registerForm.firstName.trim() || !registerForm.email.trim()) {
-      setRegisterMessage("Заполните фамилию, имя и email.");
-      return;
-    }
-    if (!registerForm.password.trim()) {
-      setRegisterMessage("Укажите пароль.");
-      return;
-    }
-    if (registerForm.password.length < 6) {
-      setRegisterMessage("Пароль слишком короткий. Минимум 6 символов.");
-      return;
-    }
-    if (registerForm.password !== registerForm.confirmPassword) {
-      setRegisterMessage("Пароли не совпадают.");
-      return;
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())) {
-      setRegisterMessage("Укажите корректный email.");
-      return;
-    }
-    const response = await fetch(`${API_BASE_URL}/api/users/users/register/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        last_name: registerForm.lastName.trim(),
-        first_name: registerForm.firstName.trim(),
-        middle_name: registerForm.middleName.trim() || "",
-        email: registerForm.email.trim(),
-        password: registerForm.password,
-        phone: registerForm.phone.trim(),
-        city: registerForm.city.trim(),
-      }),
-    });
-    if (!response.ok) {
-      let details = "Не удалось зарегистрироваться.";
-      try {
-        const data = (await response.json()) as Record<string, string[] | string>;
-        const errors = Object.values(data)
-          .flatMap(value => (Array.isArray(value) ? value : [value]))
-          .filter(Boolean)
-          .join(" ");
-        if (errors) details = errors;
-      } catch {
-        // ignore
-      }
-      setRegisterMessage(details);
-      return;
-    }
-    setRegisterMessage("Учетная запись создана. Перейдите к входу.");
-    setRegisterForm({
-      lastName: "",
-      firstName: "",
-      middleName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      phone: "",
-      city: "",
-    });
-  };
-
-  if (isStudentRole || isTutorRole) {
-    return (
-      <section className="mx-auto max-w-3xl space-y-6">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            {isTutorRole ? "наставник" : "участник"}
-          </p>
-          <h1 className="text-3xl font-semibold">
-            {isTutorRole ? "Работа с проектами" : "Мои заявки"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {isTutorRole
-              ? "Добавляйте и редактируйте проекты учеников в одном разделе."
-              : "Создавайте и обновляйте проекты в упрощенном интерфейсе."}
-          </p>
-        </div>
-        <Card className="border-border/70 bg-card/85">
-          <CardHeader>
-            <CardTitle className="text-xl">Что делать дальше</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Перейдите в раздел «Мои проекты».</p>
-            <p>2. Заполните форму и добавьте файл проекта.</p>
-            <p>3. Проверяйте список сохраненных проектов справа.</p>
-            <Button className="w-full sm:w-auto" asChild>
-              <Link href="/apply">Открыть мои проекты</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (isExpertRole) {
-    return (
-      <section className="mx-auto max-w-4xl space-y-6">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">эксперт</p>
-          <h1 className="text-3xl font-semibold">Проверка работ</h1>
-          <p className="text-sm text-muted-foreground">
-            Откройте назначения, скачайте архив работ и выставляйте оценки по критериям.
-          </p>
-        </div>
-        <Card className="border-border/70 bg-card/85">
-          <CardHeader>
-            <CardTitle className="text-xl">Быстрый старт</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Перейдите в «Назначения».</p>
-            <p>2. Скачайте ZIP с работами по каждому назначению.</p>
-            <p>3. Для очных этапов ориентируйтесь на аудиторию в карточке назначения.</p>
-            <Button className="w-full sm:w-auto" asChild>
-              <Link href="/assignments">Открыть назначения</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (roleCode === "organizer") {
-    return (
-      <section className="mx-auto max-w-5xl space-y-6">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">организатор</p>
-          <h1 className="text-3xl font-semibold">Рабочая панель</h1>
-          <p className="text-sm text-muted-foreground">
-            Быстрый доступ к управлению конференциями, секциями и пользователями.
-          </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            { label: "Конференций", value: String(conferences.length) },
-            { label: "Секций", value: String(sections.length) },
-            { label: "Статус", value: apiState === "ready" ? "Данные загружены" : "Загрузка" },
-          ].map(item => (
-            <Card key={item.label} className="border-border/70 bg-card/85">
-              <CardContent className="space-y-1 p-4">
-                <p className="text-2xl font-semibold">{item.value}</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{item.label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <Card className="border-border/70 bg-card/85">
-          <CardHeader>
-            <CardTitle className="text-xl">Быстрые действия</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-            <Button className="w-full" asChild>
-              <Link href="/conferences">Конференции</Link>
-            </Button>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/sections">Секции</Link>
-            </Button>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/users">Пользователи</Link>
-            </Button>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/criteria">Критерии</Link>
-            </Button>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/assignments">Назначения</Link>
-            </Button>
-            <Button className="w-full" variant="outline" asChild>
-              <Link href="/scores">Оценки</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
   return (
     <>
       <section className="grid gap-10 md:grid-cols-[1.2fr_0.8fr]">
@@ -264,16 +114,23 @@ export function HomePage() {
             Управляйте очными и заочными конференциями без лишних табличек
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground">
-            Минимальный, понятный и аккуратный интерфейс для организаторов, участников и экспертов. Всё, что нужно для
-            учебного проекта — и ничего лишнего.
+            Минимальный, понятный и аккуратный интерфейс для организаторов, участников и экспертов.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button size="lg" asChild>
-              <Link href="/apply">Открыть приём заявок</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <a href="#events">К событиям</a>
-            </Button>
+            {isGuest ? (
+              <>
+                <Button size="lg" asChild>
+                  <Link href="/login">Войти</Link>
+                </Button>
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/register">Регистрация</Link>
+                </Button>
+              </>
+            ) : roleContext ? (
+              <Button size="lg" asChild>
+                <Link href={roleContext.primaryHref}>{roleContext.primaryLabel}</Link>
+              </Button>
+            ) : null}
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {stats.map(item => (
@@ -290,117 +147,39 @@ export function HomePage() {
           ) : null}
         </div>
 
-        {isGuest ? (
-          <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
-            <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
-            <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-xl">Регистрация участника</CardTitle>
-              <p className="text-sm text-muted-foreground">Роль автоматически установится как «участник».</p>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Фамилия</Label>
-                  <Input
-                    value={registerForm.lastName}
-                    onChange={event => setRegisterForm(current => ({ ...current, lastName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Имя</Label>
-                  <Input
-                    value={registerForm.firstName}
-                    onChange={event => setRegisterForm(current => ({ ...current, firstName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Отчество</Label>
-                  <Input
-                    value={registerForm.middleName}
-                    onChange={event => setRegisterForm(current => ({ ...current, middleName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={registerForm.email}
-                    onChange={event => setRegisterForm(current => ({ ...current, email: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Пароль</Label>
-                  <Input
-                    type="password"
-                    value={registerForm.password}
-                    onChange={event => setRegisterForm(current => ({ ...current, password: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Повтор пароля</Label>
-                  <Input
-                    type="password"
-                    value={registerForm.confirmPassword}
-                    onChange={event =>
-                      setRegisterForm(current => ({ ...current, confirmPassword: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Телефон</Label>
-                  <Input
-                    value={registerForm.phone}
-                    onChange={event => setRegisterForm(current => ({ ...current, phone: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Город</Label>
-                  <Input
-                    value={registerForm.city}
-                    onChange={event => setRegisterForm(current => ({ ...current, city: event.target.value }))}
-                  />
-                </div>
-              </div>
-              {registerMessage ? <p>{registerMessage}</p> : null}
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={submitRegistration}>Создать аккаунт</Button>
-                <Button variant="outline" asChild>
-                  <Link href="/login">Уже есть аккаунт</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
-            <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
-            <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-xl">Ближайшая конференция</CardTitle>
-              <p className="text-sm text-muted-foreground">Подготовка к весенней сессии</p>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="rounded-xl border border-border/60 bg-background/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">24–26 апреля</p>
-                <p className="mt-2 text-lg font-semibold">Межвузовские дни науки</p>
-                <p className="mt-2 text-sm text-muted-foreground">Очный формат + онлайн-доклады</p>
-              </div>
-              <div className="space-y-3">
-                {["Открыть секции", "Назначить экспертов", "Сформировать протокол"].map(item => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between rounded-lg border border-border/60 bg-background/80 px-4 py-3 text-sm"
-                  >
-                    <span>{item}</span>
-                    <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">готово</span>
-                  </div>
+        <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
+          <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
+          <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl">{roleContext ? roleContext.title : "Начать работу"}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {roleContext ? roleContext.description : "Создайте аккаунт или войдите, чтобы продолжить."}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            {roleContext ? (
+              <div className="grid gap-2">
+                {roleContext.actions.map(action => (
+                  <Button key={action.href} variant="outline" className="w-full" asChild>
+                    <Link href={action.href}>{action.label}</Link>
+                  </Button>
                 ))}
               </div>
-              <Button variant="outline" className="w-full" asChild>
-                <Link href="/conferences">Перейти к настройкам</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="grid gap-2">
+                <Button className="w-full" asChild>
+                  <Link href="/register">Регистрация</Link>
+                </Button>
+                <Button className="w-full" variant="outline" asChild>
+                  <Link href="/login">Войти</Link>
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {roleContext ? "Функции доступны согласно вашей роли." : "Регистрация открывает доступ к личному кабинету."}
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
     </>

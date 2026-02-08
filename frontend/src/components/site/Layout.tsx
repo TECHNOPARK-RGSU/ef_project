@@ -149,9 +149,15 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
           <p>Projectaris • Платформа конференций</p>
           <div className="flex flex-wrap gap-4">
-            <span>Политика</span>
-            <span>Контакты</span>
-            <span>Документы</span>
+            <Link href="/policy" className="hover:text-foreground transition-colors">
+              Политика
+            </Link>
+            <Link href="/contacts" className="hover:text-foreground transition-colors">
+              Контакты
+            </Link>
+            <Link href="/documents" className="hover:text-foreground transition-colors">
+              Документы
+            </Link>
           </div>
         </div>
       </footer>

@@ -6,6 +6,7 @@ import { API_BASE_URL } from "@/lib/api";
 import { setAuthToken, setAuthUserInfo } from "@/lib/auth";
 import { useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
+import { Link } from "wouter";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -77,6 +78,12 @@ export function LoginPage() {
           </div>
           <Button onClick={login}>Войти</Button>
           {message ? <p>{message}</p> : null}
+          <p className="text-xs text-muted-foreground">
+            Нет аккаунта?{" "}
+            <Link href="/register" className="text-primary hover:underline">
+              Зарегистрироваться
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </section>

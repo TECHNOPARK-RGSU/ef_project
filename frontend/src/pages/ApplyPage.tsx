@@ -48,6 +48,7 @@ export function ApplyPage() {
   const [file, setFile] = useState<File | null>(null);
   const [projectsQuery, setProjectsQuery] = useState("");
   const [projectsSort, setProjectsSort] = useState<"updated_desc" | "title_asc">("updated_desc");
+  const [projectsPage, setProjectsPage] = useState(1);
   const [adminSectionFilter, setAdminSectionFilter] = useState("all");
   const [adminStatusFilter, setAdminStatusFilter] = useState("all");
   const [adminStageFilter, setAdminStageFilter] = useState("all");
@@ -159,6 +160,18 @@ export function ApplyPage() {
     projectsQuery,
     projectsSort,
   ]);
+  const projectsPerPage = 6;
+  const totalPages = Math.max(1, Math.ceil(visibleProjects.length / projectsPerPage));
+  const paginatedProjects = useMemo(() => {
+    const start = (projectsPage - 1) * projectsPerPage;
+    return visibleProjects.slice(start, start + projectsPerPage);
+  }, [projectsPage, visibleProjects]);
+  useEffect(() => {
+    setProjectsPage(1);
+  }, [projectsQuery, projectsSort, adminSectionFilter, adminStatusFilter, adminStageFilter]);
+  useEffect(() => {
+    if (projectsPage > totalPages) setProjectsPage(totalPages);
+  }, [projectsPage, totalPages]);
   const deadlines = useMemo(() => {
     const dedup = new Map<string, { title: string; start: string; end: string }>();
     visibleProjects.forEach(project => {
@@ -791,91 +804,106 @@ export function ApplyPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="overflow-x-auto rounded-lg border border-border/60">
-                  <table className="w-full min-w-[760px] text-left text-sm">
-                    <thead className="bg-muted/40 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2">Тема</th>
-                        <th className="px-3 py-2">Секция</th>
-                        <th className="px-3 py-2">Формат</th>
-                        <th className="px-3 py-2">Статус</th>
-                        <th className="px-3 py-2">Руководитель</th>
-                        <th className="px-3 py-2">Этап</th>
-                        <th className="px-3 py-2">Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleProjects.length ? (
-                        visibleProjects.map(project => {
-                          const currentIndex = getStatusIndex(project.status?.code);
-                          const nextStatusCode = getNextStatusCode(project.status?.code);
-                          return (
-                            <tr key={project.id} className="border-t border-border/50 align-top">
-                              <td className="px-3 py-3">
-                                <p className="font-medium text-foreground">{project.title}</p>
-                              </td>
-                              <td className="px-3 py-3">{project.section?.name || "—"}</td>
-                              <td className="px-3 py-3">{project.presentation_type?.name || "—"}</td>
-                              <td className="px-3 py-3">
-                                <p>{project.status?.name || "—"}</p>
-                                <div className="mt-1 flex gap-1">
-                                  {(availableStatusFlow.length ? availableStatusFlow : statusFlow).map((step, index) => (
-                                    <span
-                                      key={step.code}
-                                      className={`h-1.5 w-6 rounded-full ${
-                                        currentIndex >= index ? "bg-primary" : "bg-muted"
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-3 py-3">
-                                {project.leader
-                                  ? `${project.leader.last_name || ""} ${project.leader.first_name || ""}`.trim()
-                                  : "—"}
-                              </td>
-                              <td className="px-3 py-3">{project.stage?.name || "—"}</td>
-                              <td className="px-3 py-3">
-                                <div className="flex flex-wrap gap-2">
-                                  <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
-                                    Править
-                                  </Button>
-                                  {nextStatusCode ? (
-                                    <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, nextStatusCode)}>
-                                      Следующий
-                                    </Button>
-                                  ) : null}
-                                  <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
-                                    Доработка
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={() => deleteProject(project.id)}>
-                                    Удалить
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="px-3 py-4 text-muted-foreground">
-                            Доклады не найдены по текущим фильтрам.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                {paginatedProjects.length ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {paginatedProjects.map(project => {
+                      const currentIndex = getStatusIndex(project.status?.code);
+                      const nextStatusCode = getNextStatusCode(project.status?.code);
+                      const leaderName = project.leader
+                        ? `${project.leader.last_name || ""} ${project.leader.first_name || ""}`.trim()
+                        : "—";
+                      return (
+                        <div key={project.id} className="rounded-lg border border-border/60 bg-background/70 p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">{project.title}</p>
+                              <p className="text-xs text-muted-foreground">{project.section?.name || "Секция не указана"}</p>
+                            </div>
+                            <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-[0.2em]">
+                              {project.status?.name || "Без статуса"}
+                            </span>
+                          </div>
+                          <div className="grid gap-2 text-sm text-muted-foreground">
+                            <p>Формат: {project.presentation_type?.name || "—"}</p>
+                            <p>Этап: {project.stage?.name || "—"}</p>
+                            <p>Руководитель: {leaderName}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            {(availableStatusFlow.length ? availableStatusFlow : statusFlow).map((step, index) => (
+                              <span
+                                key={step.code}
+                                className={`h-1.5 w-6 rounded-full ${
+                                  currentIndex >= index ? "bg-primary" : "bg-muted"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
+                              Редактировать
+                            </Button>
+                            {nextStatusCode ? (
+                              <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, nextStatusCode)}>
+                                Следующий статус
+                              </Button>
+                            ) : null}
+                            <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
+                              Доработка
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => deleteProject(project.id)}>
+                              Удалить
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Доклады не найдены по текущим фильтрам.</p>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-sm text-muted-foreground">
+                  <span>
+                    Показано {paginatedProjects.length} из {visibleProjects.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={projectsPage <= 1}
+                      onClick={() => setProjectsPage(page => Math.max(1, page - 1))}
+                    >
+                      Назад
+                    </Button>
+                    <span>
+                      {projectsPage} / {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={projectsPage >= totalPages}
+                      onClick={() => setProjectsPage(page => Math.min(totalPages, page + 1))}
+                    >
+                      Вперёд
+                    </Button>
+                  </div>
                 </div>
               </>
-            ) : visibleProjects.length ? (
-              visibleProjects.map(project => (
+            ) : paginatedProjects.length ? (
+              paginatedProjects.map(project => (
                 <div
                   key={project.id}
-                  className="rounded-lg border border-border/60 bg-background/70 p-3 space-y-1"
+                  className="rounded-lg border border-border/60 bg-background/70 p-4 space-y-3"
                 >
-                  <p className="font-semibold text-foreground">{project.title}</p>
-                  <p>Секция: {project.section?.name || "не указана"}</p>
-                  <p>Статус: {project.status?.name || "не указан"}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-foreground">{project.title}</p>
+                      <p className="text-xs text-muted-foreground">{project.section?.name || "Секция не указана"}</p>
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-[0.2em]">
+                      {project.status?.name || "Без статуса"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Этап: {project.stage?.name || "—"}</p>
                   {project.section?.conference?.start_date && project.section?.conference?.end_date ? (
                     <p>
                       Дедлайн этапа:{" "}
@@ -920,16 +948,42 @@ export function ApplyPage() {
                       </Button>
                     </div>
                   ) : null}
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
-                      Редактировать
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
+                    Редактировать
+                  </Button>
                 </div>
               ))
             ) : (
               <p>Проектов пока нет.</p>
             )}
+            {!isOrganizerRole ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-sm text-muted-foreground">
+                <span>
+                  Показано {paginatedProjects.length} из {visibleProjects.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={projectsPage <= 1}
+                    onClick={() => setProjectsPage(page => Math.max(1, page - 1))}
+                  >
+                    Назад
+                  </Button>
+                  <span>
+                    {projectsPage} / {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={projectsPage >= totalPages}
+                    onClick={() => setProjectsPage(page => Math.min(totalPages, page + 1))}
+                  >
+                    Вперёд
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {replyMessage ? <p>{replyMessage}</p> : null}
           </CardContent>
         </Card>

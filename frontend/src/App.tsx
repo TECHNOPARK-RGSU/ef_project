@@ -7,8 +7,10 @@ import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
 import { CriteriaPage } from "@/pages/CriteriaPage";
 import { HomePage } from "@/pages/HomePage";
+import { ContactsPage, DocumentsPage, PolicyPage } from "@/pages/InfoPages";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SectionsPage } from "@/pages/SectionsPage";
 import { ScoresPage } from "@/pages/ScoresPage";
@@ -101,7 +103,8 @@ export function App() {
   const canAccessAdminCatalogs = isOrganizer;
 
   const isAllowedPath = (path: string) => {
-    if (path === "/" || path === "/login") return true;
+    if (path === "/" || path === "/login" || path === "/register") return true;
+    if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
     if (path === "/apply") return canAccessApply;
     if (path === "/assignments") return canAccessAssignments;
     if (path === "/scores") return canAccessScores;
@@ -115,11 +118,12 @@ export function App() {
   };
 
   useEffect(() => {
-    if (!token && location !== "/login" && location !== "/") {
+    if (!token && location !== "/login" && location !== "/register" && location !== "/") {
+      if (["/policy", "/contacts", "/documents"].includes(location)) return;
       setLocation("/login");
       return;
     }
-    if (token && authState === "ready" && location === "/login") {
+    if (token && authState === "ready" && (location === "/login" || location === "/register")) {
       setLocation(defaultPath);
       return;
     }
@@ -130,10 +134,18 @@ export function App() {
 
   return (
     <SiteLayout roleCode={roleCode}>
-      {!token && location === "/" ? (
-        <HomePage />
-      ) : !token ? (
-        <LoginPage />
+      {!token ? (
+        <Switch>
+          <Route path="/" component={HomePage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
+          <Route path="/policy" component={PolicyPage} />
+          <Route path="/contacts" component={ContactsPage} />
+          <Route path="/documents" component={DocumentsPage} />
+          <Route>
+            <NotFoundPage />
+          </Route>
+        </Switch>
       ) : authState === "loading" ? (
         <Card className="border-border/70 bg-card/80">
           <CardContent className="p-6 text-sm text-muted-foreground">Загружаем профиль…</CardContent>
@@ -153,7 +165,11 @@ export function App() {
           {canAccessAdminCatalogs ? <Route path="/users/:id" component={UserDetailPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
           {canAccessComments ? <Route path="/comments" component={CommentsPage} /> : null}
+          <Route path="/policy" component={PolicyPage} />
+          <Route path="/contacts" component={ContactsPage} />
+          <Route path="/documents" component={DocumentsPage} />
           <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
           <Route>
             <NotFoundPage />
           </Route>
