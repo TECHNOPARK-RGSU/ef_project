@@ -4,18 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
-import { formatDateRange, formatFormat } from "@/lib/format";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type { Conference, Section } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
-
-const toTrackCards = (sections: Section[]) =>
-  sections.slice(0, 3).map(section => ({
-    name: section.name,
-    age: section.category?.name ?? "Категория не указана",
-    format: section.conference?.title ?? "Конференция не указана",
-  }));
 
 export function HomePage() {
   const authUser = getAuthUserInfo();
@@ -25,10 +17,8 @@ export function HomePage() {
   const isTutorRole = roleCode === "tutor";
   const isExpertRole = roleCode === "expert";
   const [apiState, setApiState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [metaState, setMetaState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [selectedConference, setSelectedConference] = useState<Conference | null>(null);
   const [registerMessage, setRegisterMessage] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     lastName: "",
@@ -64,30 +54,28 @@ export function HomePage() {
     if (isGuest) return;
     const controller = new AbortController();
     const loadMeta = async () => {
-      setMetaState("loading");
-      const requests = [fetchList<Section>("/api/conf/sections/", controller.signal).then(setSections)];
-
-      const results = await Promise.allSettled(requests);
-      if (controller.signal.aborted) return;
-      setMetaState(results.some(result => result.status === "fulfilled") ? "ready" : "error");
+      try {
+        const items = await fetchList<Section>("/api/conf/sections/", controller.signal);
+        setSections(items);
+      } catch {
+        setSections([]);
+      }
     };
 
     loadMeta();
     return () => controller.abort();
   }, [isGuest]);
 
-  const visibleConferences = useMemo(() => conferences, [conferences]);
-  const visibleTracks = useMemo(() => toTrackCards(sections), [sections]);
-  useEffect(() => {
-    if (!selectedConference && visibleConferences.length) {
-      setSelectedConference(visibleConferences[0]);
-    }
-  }, [selectedConference, visibleConferences]);
-
-  const stats = [
-    { value: String(sections.length), label: "Секций" },
-    { value: String(conferences.length), label: "Конференций" },
-  ];
+  const stats = isGuest
+    ? [
+        { value: "—", label: "Проведено конференций" },
+        { value: "—", label: "Участников" },
+        { value: "—", label: "Экспертных проверок" },
+      ]
+    : [
+        { value: String(conferences.length), label: "Конференций" },
+        { value: String(sections.length), label: "Секций" },
+      ];
 
   const submitRegistration = async () => {
     setRegisterMessage(null);
@@ -212,6 +200,59 @@ export function HomePage() {
     );
   }
 
+  if (roleCode === "organizer") {
+    return (
+      <section className="mx-auto max-w-5xl space-y-6">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">организатор</p>
+          <h1 className="text-3xl font-semibold">Рабочая панель</h1>
+          <p className="text-sm text-muted-foreground">
+            Быстрый доступ к управлению конференциями, секциями и пользователями.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            { label: "Конференций", value: String(conferences.length) },
+            { label: "Секций", value: String(sections.length) },
+            { label: "Статус", value: apiState === "ready" ? "Данные загружены" : "Загрузка" },
+          ].map(item => (
+            <Card key={item.label} className="border-border/70 bg-card/85">
+              <CardContent className="space-y-1 p-4">
+                <p className="text-2xl font-semibold">{item.value}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{item.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card className="border-border/70 bg-card/85">
+          <CardHeader>
+            <CardTitle className="text-xl">Быстрые действия</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+            <Button className="w-full" asChild>
+              <Link href="/conferences">Конференции</Link>
+            </Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/sections">Секции</Link>
+            </Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/users">Пользователи</Link>
+            </Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/criteria">Критерии</Link>
+            </Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/assignments">Назначения</Link>
+            </Button>
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/scores">Оценки</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
   return (
     <>
       <section className="grid gap-10 md:grid-cols-[1.2fr_0.8fr]">
@@ -244,6 +285,9 @@ export function HomePage() {
               </Card>
             ))}
           </div>
+          {isGuest ? (
+            <p className="text-xs text-muted-foreground">Подробная статистика доступна после входа.</p>
+          ) : null}
         </div>
 
         {isGuest ? (
@@ -357,150 +401,6 @@ export function HomePage() {
             </CardContent>
           </Card>
         )}
-      </section>
-
-      <section className="mt-16 space-y-6" id="events">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">конференции</p>
-            <h2 className="text-2xl font-semibold">Ближайшие события</h2>
-          </div>
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            <span
-              className={`rounded-full px-3 py-1 ${apiState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}
-            >
-              {apiState === "ready" ? "данные загружены" : "нет данных"}
-            </span>
-            <Button variant="outline" asChild>
-              <Link href="/conferences">Все конференции</Link>
-            </Button>
-          </div>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="grid gap-4 md:grid-cols-2">
-            {apiState === "loading" && !conferences.length ? (
-              <Card className="border-border/70 bg-card/80">
-                <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
-                  Загружаем список конференций…
-                </CardContent>
-              </Card>
-            ) : visibleConferences.length ? (
-              visibleConferences.map((conf, index) => (
-                <Card
-                  key={conf.id}
-                  className={`border-border/70 bg-card/80 animate-rise ${
-                    selectedConference?.id === conf.id ? "ring-1 ring-primary/40" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 120}ms` }}
-                >
-                  <CardHeader className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      {formatDateRange(conf.start_date, conf.end_date)}
-                    </p>
-                    <CardTitle className="text-lg">{conf.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{conf.location || "Место уточняется"}</p>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{formatFormat(conf)}</span>
-                    <Button size="sm" variant="secondary" onClick={() => setSelectedConference(conf)}>
-                      Подробнее
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <Card className="border-border/70 bg-card/80">
-                <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
-                  Конференции пока не созданы.
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          <Card className="border-border/70 bg-card/85">
-            <CardHeader className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">детали</p>
-              <CardTitle className="text-xl">{selectedConference?.title ?? "Выберите конференцию"}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              {selectedConference ? (
-                <>
-                  <div className="rounded-lg border border-border/60 bg-background/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      {formatDateRange(selectedConference.start_date, selectedConference.end_date)}
-                    </p>
-                    <p className="mt-2 text-base font-semibold text-foreground">
-                      {formatFormat(selectedConference)}
-                    </p>
-                    <p className="mt-2">{selectedConference.location || "Место уточняется"}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p>Приём заявок открыт до окончания конференции.</p>
-                    <p>Можно добавить секции и распределить экспертов.</p>
-                  </div>
-                  <Button className="w-full" asChild>
-                    <Link href={`/conferences/${selectedConference.id}`}>Открыть карточку</Link>
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p>Нажмите «Подробнее» у нужного события.</p>
-                  <Button className="w-full" disabled>
-                    Открыть карточку
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section className="mt-16 space-y-6" id="tracks">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">секции</p>
-            <h2 className="text-2xl font-semibold">Шаблоны направлений</h2>
-          </div>
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            <span
-              className={`rounded-full px-3 py-1 ${metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"}`}
-            >
-              {metaState === "ready" ? "данные загружены" : "нет данных"}
-            </span>
-            <Button variant="outline" asChild>
-              <Link href="/sections">Добавить секцию</Link>
-            </Button>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {visibleTracks.length ? (
-            visibleTracks.map((track, index) => (
-              <Card
-                key={track.name}
-                className="border-border/70 bg-card/80 animate-rise"
-                style={{ animationDelay: `${index * 120}ms` }}
-              >
-                <CardHeader className="space-y-3">
-                  <CardTitle className="text-lg">{track.name}</CardTitle>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>{track.age}</p>
-                    <p>{track.format}</p>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="secondary" className="w-full" asChild>
-                    <Link href="/sections">Открыть секцию</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card className="border-border/70 bg-card/80">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                Секций пока нет. Добавьте направления в разделе «Секции».
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </section>
 
     </>
