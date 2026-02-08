@@ -13,27 +13,14 @@ function getNavItems(roleCode: string): NavItem[] {
     return [
       { label: "Главная", href: "/" },
       { label: "Конференции", href: "/conferences" },
-      { label: "Заявки", href: "/apply" },
-      { label: "Назначения", href: "/assignments" },
-      { label: "Критерии", href: "/criteria" },
-      { label: "Оценки", href: "/scores" },
-      { label: "Комментарии", href: "/comments" },
       { label: "Пользователи", href: "/users" },
       { label: "Справочники", href: "/catalogs" },
     ];
   }
-  if (normalizedRole === "expert") {
+  if (normalizedRole === "expert" || normalizedRole === "tutor" || isStudentRole(normalizedRole)) {
     return [
       { label: "Главная", href: "/" },
-      { label: "Назначения", href: "/assignments" },
-      { label: "Оценки", href: "/scores" },
-      { label: "Комментарии", href: "/comments" },
-    ];
-  }
-  if (normalizedRole === "tutor" || isStudentRole(normalizedRole)) {
-    return [
-      { label: "Главная", href: "/" },
-      { label: "Мои проекты", href: "/apply" },
+      { label: "Конференции", href: "/conferences" },
     ];
   }
   return [{ label: "Главная", href: "/" }];
@@ -105,13 +92,9 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
                   <Button asChild>
                     <Link href="/conferences">Новая конференция</Link>
                   </Button>
-                ) : normalizedRole === "expert" ? (
-                  <Button asChild>
-                    <Link href="/assignments">Мои назначения</Link>
-                  </Button>
                 ) : (
                   <Button asChild>
-                    <Link href="/apply">Мои проекты</Link>
+                    <Link href="/conferences">Конференции</Link>
                   </Button>
                 )}
               </>

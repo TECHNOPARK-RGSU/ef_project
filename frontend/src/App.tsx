@@ -5,7 +5,6 @@ import { CatalogsPage } from "@/pages/CatalogsPage";
 import { CommentsPage } from "@/pages/CommentsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
-import { CriteriaPage } from "@/pages/CriteriaPage";
 import { HomePage } from "@/pages/HomePage";
 import { ContactsPage, DocumentsPage, PolicyPage } from "@/pages/InfoPages";
 import { LoginPage } from "@/pages/LoginPage";
@@ -87,29 +86,21 @@ export function App() {
   const isTutor = roleCode === "tutor";
   const isStudent = isStudentRole(roleCode);
 
+  const canAccessConferences = isOrganizer || isExpert || isTutor || isStudent;
   const defaultPath = useMemo(() => {
-    if (isOrganizer) return "/conferences";
-    if (isExpert) return "/assignments";
-    if (isTutor || isStudent) return "/apply";
+    if (canAccessConferences) return "/conferences";
     return "/";
-  }, [isExpert, isOrganizer, isStudent, isTutor]);
+  }, [canAccessConferences]);
 
-  const canAccessConferences = isOrganizer;
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;
   const canAccessScores = isOrganizer || isExpert;
-  const canAccessCriteria = isOrganizer;
   const canAccessComments = isOrganizer || isExpert || isTutor;
   const canAccessAdminCatalogs = isOrganizer;
 
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;
     if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
-    if (path === "/apply") return canAccessApply;
-    if (path === "/assignments") return canAccessAssignments;
-    if (path === "/scores") return canAccessScores;
-    if (path === "/criteria") return canAccessCriteria;
-    if (path === "/comments") return canAccessComments;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
     if (path === "/sections" || path === "/roles" || path === "/users" || path.startsWith("/users/") || path === "/catalogs") {
       return canAccessAdminCatalogs;
@@ -155,16 +146,15 @@ export function App() {
           <Route path="/" component={HomePage} />
           {canAccessConferences ? <Route path="/conferences" component={ConferencesPage} /> : null}
           {canAccessConferences ? <Route path="/conferences/:id" component={ConferenceDetailPage} /> : null}
-          {canAccessApply ? <Route path="/apply" component={ApplyPage} /> : null}
-          {canAccessAssignments ? <Route path="/assignments" component={AssignmentsPage} /> : null}
-          {canAccessCriteria ? <Route path="/criteria" component={CriteriaPage} /> : null}
-          {canAccessScores ? <Route path="/scores" component={ScoresPage} /> : null}
+          {canAccessConferences && canAccessApply ? <Route path="/conferences/:id/projects" component={ApplyPage} /> : null}
+          {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
+          {canAccessConferences && canAccessScores ? <Route path="/conferences/:id/scores" component={ScoresPage} /> : null}
+          {canAccessConferences && canAccessComments ? <Route path="/conferences/:id/comments" component={CommentsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users/:id" component={UserDetailPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
-          {canAccessComments ? <Route path="/comments" component={CommentsPage} /> : null}
           <Route path="/policy" component={PolicyPage} />
           <Route path="/contacts" component={ContactsPage} />
           <Route path="/documents" component={DocumentsPage} />

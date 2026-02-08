@@ -7,8 +7,11 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { Conference, ExpertAssignment } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
 
 export function AssignmentsPage() {
+  const [, paramsFromRoute] = useRoute("/conferences/:id/assignments");
+  const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const authUser = getAuthUserInfo();
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isOrganizerRole = roleCode === "organizer";
@@ -17,6 +20,12 @@ export function AssignmentsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("all");
+  useEffect(() => {
+    if (conferenceIdFromRoute != null) {
+      setConferenceFilter(String(conferenceIdFromRoute));
+      setForm(f => ({ ...f, conferenceId: String(conferenceIdFromRoute) }));
+    }
+  }, [conferenceIdFromRoute]);
   const [stageFilter, setStageFilter] = useState("all");
   const [assignmentsPage, setAssignmentsPage] = useState(1);
   const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
@@ -124,14 +133,21 @@ export function AssignmentsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">назначения</p>
-        <h1 className="text-3xl font-semibold">{isOrganizerRole ? "Распределение работ" : "Мои назначения"}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">назначения</p>
+          <h1 className="text-3xl font-semibold">{isOrganizerRole ? "Распределение работ" : "Мои назначения"}</h1>
         <p className="text-sm text-muted-foreground">
           {isOrganizerRole
             ? "Организатор распределяет проекты между экспертами."
             : "Здесь отображаются только ваши проекты на проверку."}
         </p>
+        </div>
+        {conferenceIdFromRoute != null ? (
+          <Button variant="outline" asChild>
+            <Link href={`/conferences/${conferenceIdFromRoute}`}>← К конференции</Link>
+          </Button>
+        ) : null}
       </div>
 
       {isOrganizerRole ? (
@@ -142,18 +158,24 @@ export function AssignmentsPage() {
           <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
             <div className="space-y-2">
               <Label>Конференция</Label>
-              <Select value={form.conferenceId || undefined} onValueChange={value => setForm({ ...form, conferenceId: value })}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите конференцию" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conferences.map(conf => (
-                    <SelectItem key={conf.id} value={String(conf.id)}>
-                      {conf.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {conferenceIdFromRoute != null ? (
+                <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+                  {conferences.find(c => c.id === conferenceIdFromRoute)?.title ?? String(conferenceIdFromRoute)}
+                </div>
+              ) : (
+                <Select value={form.conferenceId || undefined} onValueChange={value => setForm({ ...form, conferenceId: value })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите конференцию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {conferences.map(conf => (
+                      <SelectItem key={conf.id} value={String(conf.id)}>
+                        {conf.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Этап</Label>
@@ -201,19 +223,25 @@ export function AssignmentsPage() {
           </div>
           <div className="space-y-2">
             <Label>Конференция</Label>
-            <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Все конференции" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все конференции</SelectItem>
-                {conferences.map(conf => (
-                  <SelectItem key={conf.id} value={String(conf.id)}>
-                    {conf.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {conferenceIdFromRoute != null ? (
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+                {conferences.find(c => c.id === conferenceIdFromRoute)?.title ?? String(conferenceIdFromRoute)}
+              </div>
+            ) : (
+              <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Все конференции" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все конференции</SelectItem>
+                  {conferences.map(conf => (
+                    <SelectItem key={conf.id} value={String(conf.id)}>
+                      {conf.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Этап</Label>

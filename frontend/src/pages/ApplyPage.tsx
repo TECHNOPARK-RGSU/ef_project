@@ -12,7 +12,6 @@ import type {
   Comment,
   Conference,
   ConferenceStageAvailability,
-  ConferenceStatusFlowItem,
   ParticipationStage,
   PresentationType,
   Project,
@@ -22,15 +21,11 @@ import type {
   User,
 } from "@/lib/types";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useRoute } from "wouter";
 
 export function ApplyPage() {
-  const statusFlow = [
-    { code: "new", label: "Новый" },
-    { code: "in_review", label: "На рецензии" },
-    { code: "rework", label: "На доработке" },
-    { code: "approved", label: "Согласован" },
-    { code: "final", label: "Финал" },
-  ];
+  const [, paramsFromRoute] = useRoute("/conferences/:id/projects");
+  const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const authUser = getAuthUserInfo();
   const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
   const isStudentRole = isStudentRoleCode(roleCode);
@@ -40,7 +35,6 @@ export function ApplyPage() {
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [conferences, setConferences] = useState<Conference[]>([]);
-  const [statusFlowItems, setStatusFlowItems] = useState<ConferenceStatusFlowItem[]>([]);
   const [stageItems, setStageItems] = useState<ConferenceStageAvailability[]>([]);
   const [stages, setStages] = useState<ParticipationStage[]>([]);
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
@@ -56,6 +50,9 @@ export function ApplyPage() {
   const [projectsSort, setProjectsSort] = useState<"updated_desc" | "title_asc">("updated_desc");
   const [projectsPage, setProjectsPage] = useState(1);
   const [conferenceFilter, setConferenceFilter] = useState("all");
+  useEffect(() => {
+    if (conferenceIdFromRoute != null) setConferenceFilter(String(conferenceIdFromRoute));
+  }, [conferenceIdFromRoute]);
   const [adminSectionFilter, setAdminSectionFilter] = useState("all");
   const [adminStatusFilter, setAdminStatusFilter] = useState("all");
   const [adminStageFilter, setAdminStageFilter] = useState("all");
@@ -91,9 +88,6 @@ export function ApplyPage() {
         fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(
           setPresentationTypes,
         ),
-        fetchList<ConferenceStatusFlowItem>("/api/conf/conference-status-flow/", controller.signal).then(
-          setStatusFlowItems,
-        ),
         fetchList<ConferenceStageAvailability>("/api/conf/conference-stages/", controller.signal).then(
           setStageItems,
         ),
@@ -113,29 +107,6 @@ export function ApplyPage() {
   }, []);
 
   const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(status => status.name), [statuses]);
-  const availableStatusFlow = useMemo(() => {
-    return statusFlow.filter(step =>
-      statuses.some(status => status.code.toLowerCase() === step.code),
-    );
-  }, [statuses]);
-  const statusFlowByConference = useMemo(() => {
-    const map: Record<string, { code: string; label: string; order: number }[]> = {};
-    statusFlowItems.forEach(item => {
-      const confId = item.conference?.id ? String(item.conference.id) : null;
-      const statusCode = item.status?.code?.toLowerCase();
-      if (!confId || !statusCode || !item.is_enabled) return;
-      if (!map[confId]) map[confId] = [];
-      map[confId].push({
-        code: statusCode,
-        label: item.status?.name ?? statusCode,
-        order: item.order ?? 0,
-      });
-    });
-    Object.keys(map).forEach(confId => {
-      map[confId] = map[confId].sort((a, b) => a.order - b.order);
-    });
-    return map;
-  }, [statusFlowItems]);
   const stageAvailabilityByConference = useMemo(() => {
     const map: Record<string, string[]> = {};
     stageItems.forEach(item => {
@@ -179,22 +150,6 @@ export function ApplyPage() {
     if (!allowed || !allowed.length) return stages;
     return stages.filter(stage => allowed.includes(String(stage.id)));
   }, [conferenceFilter, stageAvailabilityByConference, stages]);
-  const statusFlowForForm = useMemo(() => {
-    if (!form.conferenceId) return availableStatusFlow;
-    const flow = statusFlowByConference[form.conferenceId];
-    return flow && flow.length ? flow : availableStatusFlow;
-  }, [form.conferenceId, availableStatusFlow, statusFlowByConference]);
-  const availableStatusOptions = useMemo(() => {
-    const codes = new Set(statusFlowForForm.map(step => step.code));
-    return statuses.filter(status => codes.has(status.code.toLowerCase()));
-  }, [statusFlowForForm, statuses]);
-  const filterStatusOptions = useMemo(() => {
-    if (conferenceFilter === "all") return statuses;
-    const flow = statusFlowByConference[conferenceFilter];
-    if (!flow || !flow.length) return statuses;
-    const codes = new Set(flow.map(step => step.code));
-    return statuses.filter(status => codes.has(status.code.toLowerCase()));
-  }, [conferenceFilter, statusFlowByConference, statuses]);
   const currentStudentName = useMemo(() => {
     const currentStudent = studentUsers.find(user => user.id === authUser?.id);
     if (!currentStudent) return "Текущий пользователь";
@@ -498,23 +453,6 @@ export function ApplyPage() {
     }
   };
 
-  const getStatusFlowForConference = (conferenceId?: number | null) => {
-    if (!conferenceId) return availableStatusFlow;
-    const flow = statusFlowByConference[String(conferenceId)];
-    return flow && flow.length ? flow : availableStatusFlow;
-  };
-
-  const getStatusIndex = (statusCode: string | null | undefined, flow: { code: string }[]) => {
-    if (!statusCode) return -1;
-    return flow.findIndex(item => item.code === statusCode.toLowerCase());
-  };
-
-  const getNextStatusCode = (statusCode: string | null | undefined, flow: { code: string }[]) => {
-    const currentIndex = getStatusIndex(statusCode, flow);
-    if (currentIndex < 0 || currentIndex >= flow.length - 1) return null;
-    return flow[currentIndex + 1].code;
-  };
-
   const updateProjectStatus = async (projectId: number, statusCode: string) => {
     setSubmitMessage(null);
     const status = statuses.find(item => item.code.toLowerCase() === statusCode);
@@ -791,8 +729,8 @@ export function ApplyPage() {
                     <SelectValue placeholder="Статус проекта" />
                   </SelectTrigger>
                   <SelectContent>
-                  {availableStatusOptions.length ? (
-                    availableStatusOptions.map(status => (
+                  {statuses.length ? (
+                    statuses.map(status => (
                         <SelectItem key={status.id} value={String(status.id)}>
                           {status.name}
                         </SelectItem>
@@ -889,7 +827,14 @@ export function ApplyPage() {
       <div className="space-y-4">
         <Card className="border-border/70 bg-card/80">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Проекты</CardTitle>
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-lg">Проекты</CardTitle>
+              {conferenceIdFromRoute != null ? (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/conferences/${conferenceIdFromRoute}`}>← К конференции</Link>
+                </Button>
+              ) : null}
+            </div>
             <span
               className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
                 state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
@@ -917,19 +862,25 @@ export function ApplyPage() {
             </div>
 
             <div className="grid gap-2 md:grid-cols-3">
-              <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Конференция" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все конференции</SelectItem>
-                  {conferences.map(conf => (
-                    <SelectItem key={conf.id} value={String(conf.id)}>
-                      {conf.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {conferenceIdFromRoute == null ? (
+                <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Конференция" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все конференции</SelectItem>
+                    {conferences.map(conf => (
+                      <SelectItem key={conf.id} value={String(conf.id)}>
+                        {conf.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Конференция: {conferences.find(c => c.id === conferenceIdFromRoute)?.title ?? String(conferenceIdFromRoute)}
+                </div>
+              )}
               <Select value={archiveFilter} onValueChange={value => setArchiveFilter(value as "active" | "archived")}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Статус" />
@@ -963,7 +914,7 @@ export function ApplyPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все статусы</SelectItem>
-                      {filterStatusOptions.map(status => (
+                      {statuses.map(status => (
                         <SelectItem key={status.id} value={String(status.id)}>
                           {status.name}
                         </SelectItem>
@@ -987,10 +938,6 @@ export function ApplyPage() {
                 {paginatedProjects.length ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {paginatedProjects.map(project => {
-                      const flow = getStatusFlowForConference(project.section?.conference?.id);
-                      const currentIndex = getStatusIndex(project.status?.code, flow);
-                      const nextStatusCode = getNextStatusCode(project.status?.code, flow);
-                      const reworkAvailable = flow.some(step => step.code === "rework");
                       const leaderName = project.leader
                         ? `${project.leader.last_name || ""} ${project.leader.first_name || ""}`.trim()
                         : "—";
@@ -1010,32 +957,35 @@ export function ApplyPage() {
                             <p>Этап: {project.stage?.name || "—"}</p>
                             <p>Руководитель: {leaderName}</p>
                           </div>
-                          <div className="flex gap-1">
-                            {(flow.length ? flow : statusFlow).map((step, index) => (
-                              <span
-                                key={step.code}
-                                className={`h-1.5 w-6 rounded-full ${
-                                  currentIndex >= index ? "bg-primary" : "bg-muted"
-                                }`}
-                              />
-                            ))}
-                          </div>
+                          {!project.is_archived && statuses.length ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Статус</Label>
+                              <Select
+                                value={project.status?.id ? String(project.status.id) : ""}
+                                onValueChange={val => {
+                                  const s = statuses.find(st => st.id === Number(val));
+                                  if (s) updateProjectStatus(project.id, s.code);
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Выберите статус" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {statuses.map(st => (
+                                    <SelectItem key={st.id} value={String(st.id)}>
+                                      {st.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null}
                           <div className="flex flex-wrap gap-2">
                             {!project.is_archived ? (
                               <>
                                 <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
                                   Редактировать
                                 </Button>
-                                {nextStatusCode ? (
-                                  <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, nextStatusCode)}>
-                                    Следующий статус
-                                  </Button>
-                                ) : null}
-                                {reworkAvailable ? (
-                                  <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
-                                    Доработка
-                                  </Button>
-                                ) : null}
                                 <Button size="sm" variant="outline" onClick={() => archiveProject(project.id)}>
                                   В архив
                                 </Button>
@@ -1182,26 +1132,17 @@ export function ApplyPage() {
             {replyMessage ? <p>{replyMessage}</p> : null}
           </CardContent>
         </Card>
-        {isOrganizerRole ? (
+        {isOrganizerRole && visibleStatuses.length ? (
           <Card className="border-border/70 bg-card/80">
             <CardHeader>
-              <CardTitle className="text-lg">Воронка статусов проверки</CardTitle>
+              <CardTitle className="text-lg">Статусы проектов</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>Новый → На рецензии → На доработке → Согласован → Финал</p>
-              <div className="flex flex-wrap gap-2">
-                {(availableStatusFlow.length ? availableStatusFlow : statusFlow).map(step => (
-                  <span key={step.code} className="rounded-full border border-border/60 bg-background/70 px-2 py-1 text-xs">
-                    {step.label}
-                  </span>
-                ))}
-              </div>
-              {visibleStatuses.length ? (
-                <p>В справочнике статусов: {visibleStatuses.join(", ")}.</p>
-              ) : null}
+            <CardContent className="text-sm text-muted-foreground">
+              <p>В справочнике: {visibleStatuses.join(", ")}. Статус меняется выпадающим списком в карточке проекта.</p>
             </CardContent>
           </Card>
-        ) : (
+        ) : null}
+        {!isOrganizerRole ? (
           <>
             <Card className="border-border/70 bg-card/80">
               <CardHeader>
@@ -1246,7 +1187,7 @@ export function ApplyPage() {
               </CardContent>
             </Card>
           </>
-        )}
+        ) : null}
       </div>
     </section>
   );

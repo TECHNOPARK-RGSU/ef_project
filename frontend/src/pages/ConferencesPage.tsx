@@ -5,13 +5,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
 export function ConferencesPage() {
+  const roleCode = (getAuthUserInfo()?.roleCode ?? "").toLowerCase();
+  const isOrganizer = roleCode === "organizer";
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [query, setQuery] = useState("");
@@ -209,7 +211,7 @@ export function ConferencesPage() {
           >
             {state === "ready" ? "данные загружены" : "нет данных"}
           </span>
-          <Button onClick={handleCreateClick}>Создать</Button>
+          {isOrganizer ? <Button onClick={handleCreateClick}>Создать</Button> : null}
         </div>
       </div>
 
@@ -288,12 +290,16 @@ export function ConferencesPage() {
                   <Button size="sm" variant="secondary" asChild>
                     <Link href={`/conferences/${conf.id}`}>Карточка</Link>
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => startEdit(conf)}>
-                    Редактировать
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteConference(conf.id)}>
-                    Удалить
-                  </Button>
+                  {isOrganizer ? (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => startEdit(conf)}>
+                        Редактировать
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => deleteConference(conf.id)}>
+                        Удалить
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -328,7 +334,7 @@ export function ConferencesPage() {
         </div>
       </div>
 
-      {isModalOpen ? (
+      {isOrganizer && isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-3xl border-border/70 bg-card/95">
             <CardHeader className="flex flex-row items-start justify-between gap-3">

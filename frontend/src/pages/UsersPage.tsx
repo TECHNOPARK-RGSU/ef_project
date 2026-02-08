@@ -4,15 +4,26 @@ import { Input } from "@/components/ui/input";
 import { UserModal } from "@/components/users/UserModal";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
-import { getRoleLabel } from "@/lib/roles";
+import { getRoleLabel, normalizeRoleCode } from "@/lib/roles";
 import type { EducationalOrganization, Role, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
+
+const ROLE_TABS = [
+  { key: "student", label: "Участники" },
+  { key: "tutor", label: "Наставники" },
+  { key: "expert", label: "Эксперты" },
+  { key: "organizer", label: "Организаторы" },
+] as const;
+
+const USERS_PER_PAGE = 10;
 
 export function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleTab, setRoleTab] = useState<(typeof ROLE_TABS)[number]["key"]>("student");
+  const [usersPage, setUsersPage] = useState(1);
   const [roles, setRoles] = useState<Role[]>([]);
   const [orgs, setOrgs] = useState<EducationalOrganization[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -59,11 +70,19 @@ export function UsersPage() {
     return [...users].sort((a, b) => (a.last_name || "").localeCompare(b.last_name || ""));
   }, [users]);
 
-  const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return sortedUsers;
-    const query = searchQuery.trim().toLowerCase();
+  const filteredByRole = useMemo(() => {
     return sortedUsers.filter(user => {
-      const parts = [
+      const code = normalizeRoleCode(user.role?.code ?? "");
+      if (roleTab === "student") return code === "student";
+      return code === roleTab;
+    });
+  }, [roleTab, sortedUsers]);
+
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByRole;
+    const query = searchQuery.trim().toLowerCase();
+    return filteredByRole.filter(user => {
+      const searchable = [
         user.last_name,
         user.first_name,
         user.email,
@@ -74,18 +93,19 @@ export function UsersPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      return parts.includes(query);
+      return searchable.includes(query);
     });
-  }, [searchQuery, sortedUsers]);
+  }, [searchQuery, filteredByRole]);
 
-  const groupedUsers = useMemo(() => {
-    return filteredUsers.reduce<Record<string, User[]>>((acc, user) => {
-      const key = getRoleLabel(user.role);
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(user);
-      return acc;
-    }, {});
-  }, [filteredUsers]);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(start, start + USERS_PER_PAGE);
+  }, [filteredUsers, usersPage]);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [roleTab, searchQuery]);
 
   const openCreateModal = () => {
     setEditingUser(null);
@@ -118,15 +138,33 @@ export function UsersPage() {
 
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
 
+      <Card className="border-border/70 bg-card/80">
+        <CardHeader>
+          <CardTitle className="text-lg">Роли</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {ROLE_TABS.map(tab => (
+            <Button
+              key={tab.key}
+              variant={roleTab === tab.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setRoleTab(tab.key)}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         <Card className="border-border/70 bg-card/80">
           <CardHeader>
-            <CardTitle className="text-lg">Поиск пользователя</CardTitle>
+            <CardTitle className="text-lg">Поиск и фильтры</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="space-y-2">
               <Input
-                placeholder="Имя, email, роль или организация"
+                placeholder="Имя, email, организация"
                 value={searchQuery}
                 onChange={event => setSearchQuery(event.target.value)}
               />
@@ -137,42 +175,67 @@ export function UsersPage() {
 
         <Card className="border-border/70 bg-card/80">
           <CardHeader>
-            <CardTitle className="text-lg">Список пользователей</CardTitle>
+            <CardTitle className="text-lg">
+              {ROLE_TABS.find(t => t.key === roleTab)?.label ?? "Список"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             {loadState === "loading" ? (
               <p>Загружаем пользователей…</p>
             ) : loadState === "error" ? (
               <p>Не удалось загрузить пользователей.</p>
-            ) : filteredUsers.length ? (
-              Object.entries(groupedUsers).map(([group, groupUsers]) => (
-                <div key={group} className="space-y-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{group}</p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {groupUsers.map(user => (
-                      <div key={user.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
-                        <p className="font-semibold text-foreground">
-                          {user.last_name} {user.first_name}
-                        </p>
-                        <p>{user.email || "Email не указан"}</p>
-                        <p>Роль: {getRoleLabel(user.role)}</p>
-                        <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          <Button size="sm" variant="secondary" asChild>
-                            <Link href={`/users/${user.id}`}>Открыть</Link>
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => openEditModal(user)}>
-                            Редактировать
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => deleteUser(user.id)}>
-                            Удалить
-                          </Button>
-                        </div>
+            ) : paginatedUsers.length ? (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {paginatedUsers.map(user => (
+                    <div key={user.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
+                      <p className="font-semibold text-foreground">
+                        {user.last_name} {user.first_name}
+                      </p>
+                      <p>{user.email || "Email не указан"}</p>
+                      <p>Роль: {getRoleLabel(user.role)}</p>
+                      <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Button size="sm" variant="secondary" asChild>
+                          <Link href={`/users/${user.id}`}>Открыть</Link>
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openEditModal(user)}>
+                          Редактировать
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteUser(user.id)}>
+                          Удалить
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-muted-foreground">
+                  <span>
+                    Показано {paginatedUsers.length} из {filteredUsers.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={usersPage <= 1}
+                      onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                    >
+                      Назад
+                    </Button>
+                    <span>
+                      {usersPage} / {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={usersPage >= totalPages}
+                      onClick={() => setUsersPage(p => Math.min(totalPages, p + 1))}
+                    >
+                      Вперёд
+                    </Button>
                   </div>
                 </div>
-              ))
+              </>
             ) : (
               <p>Ничего не найдено.</p>
             )}

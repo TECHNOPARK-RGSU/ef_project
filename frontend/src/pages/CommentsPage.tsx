@@ -7,8 +7,11 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { Comment, Project, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
 
 export function CommentsPage() {
+  const [, paramsFromRoute] = useRoute("/conferences/:id/comments");
+  const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const authUser = getAuthUserInfo();
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isOrganizerRole = roleCode === "organizer";
@@ -23,6 +26,28 @@ export function CommentsPage() {
     authorId: "none",
     text: "",
   });
+  const filteredComments = useMemo(() => {
+    if (conferenceIdFromRoute == null) return comments;
+    return comments.filter(
+      c => c.project?.section?.conference?.id === conferenceIdFromRoute,
+    );
+  }, [comments, conferenceIdFromRoute]);
+  const projectsForSelect = useMemo(() => {
+    if (conferenceIdFromRoute == null) return projects;
+    return projects.filter(
+      p => p.section?.conference?.id === conferenceIdFromRoute,
+    );
+  }, [projects, conferenceIdFromRoute]);
+  const COMMENTS_PER_PAGE = 10;
+  const [commentsPage, setCommentsPage] = useState(1);
+  const commentsTotalPages = Math.max(1, Math.ceil(filteredComments.length / COMMENTS_PER_PAGE));
+  const paginatedComments = useMemo(() => {
+    const start = (commentsPage - 1) * COMMENTS_PER_PAGE;
+    return filteredComments.slice(start, start + COMMENTS_PER_PAGE);
+  }, [commentsPage, filteredComments]);
+  useEffect(() => {
+    if (commentsPage > commentsTotalPages) setCommentsPage(1);
+  }, [commentsPage, commentsTotalPages]);
   const allowedAuthors = useMemo(
     () =>
       users.filter(user => {
@@ -134,7 +159,14 @@ export function CommentsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">комментарии</p>
           <h1 className="text-3xl font-semibold">Комментарии экспертов</h1>
         </div>
-        <Button onClick={openCreateComment}>Создать комментарий</Button>
+        <div className="flex items-center gap-2">
+          {conferenceIdFromRoute != null ? (
+            <Button variant="outline" asChild>
+              <Link href={`/conferences/${conferenceIdFromRoute}`}>← К конференции</Link>
+            </Button>
+          ) : null}
+          <Button onClick={openCreateComment}>Создать комментарий</Button>
+        </div>
       </div>
 
       {isCommentModalOpen ? (
@@ -158,7 +190,7 @@ export function CommentsPage() {
                 <SelectValue placeholder="Выберите проект" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map(project => (
+                {projectsForSelect.map(project => (
                   <SelectItem key={project.id} value={String(project.id)}>
                     {project.title}
                   </SelectItem>
@@ -206,32 +238,66 @@ export function CommentsPage() {
       </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {comments.length ? (
-          comments.map(item => (
-            <Card key={item.id} className="border-border/70 bg-card/80">
-              <CardHeader>
-                <CardTitle className="text-lg">{item.project.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>{item.text}</p>
-                <p>Автор: {item.author ? `${item.author.last_name} ${item.author.first_name}` : "—"}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => startEdit(item)}>
-                    Редактировать
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteComment(item.id)}>
-                    Удалить
-                  </Button>
-                </div>
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          {paginatedComments.length ? (
+            paginatedComments.map(item => (
+              <Card key={item.id} className="border-border/70 bg-card/80">
+                <CardHeader>
+                  <CardTitle className="text-lg">{item.project.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-2">
+                  <p>{item.text}</p>
+                  <p>Автор: {item.author ? `${item.author.last_name} ${item.author.first_name}` : "—"}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => startEdit(item)}>
+                      Редактировать
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => deleteComment(item.id)}>
+                      Удалить
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="border-border/70 bg-card/80 md:col-span-2">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                {conferenceIdFromRoute != null && comments.length > 0
+                  ? "По этой конференции комментариев нет."
+                  : "Комментариев пока нет."}
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card className="border-border/70 bg-card/80">
-            <CardContent className="p-6 text-sm text-muted-foreground">Комментариев пока нет.</CardContent>
-          </Card>
-        )}
+          )}
+        </div>
+        {filteredComments.length > COMMENTS_PER_PAGE ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>
+              Показано {paginatedComments.length} из {filteredComments.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={commentsPage <= 1}
+                onClick={() => setCommentsPage(p => Math.max(1, p - 1))}
+              >
+                Назад
+              </Button>
+              <span>
+                {commentsPage} / {commentsTotalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={commentsPage >= commentsTotalPages}
+                onClick={() => setCommentsPage(p => Math.min(commentsTotalPages, p + 1))}
+              >
+                Вперёд
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

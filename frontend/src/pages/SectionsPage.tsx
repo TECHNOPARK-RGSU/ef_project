@@ -6,7 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import type { Conference, Section } from "@/lib/types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const SECTIONS_PER_PAGE = 10;
 
 export function SectionsPage() {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -17,7 +19,13 @@ export function SectionsPage() {
   const [form, setForm] = useState({ name: "", conferenceId: "", categoryId: "" });
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [sectionsPage, setSectionsPage] = useState(1);
   const formRef = useRef<HTMLDivElement | null>(null);
+  const sectionsTotalPages = Math.max(1, Math.ceil(sections.length / SECTIONS_PER_PAGE));
+  const paginatedSections = useMemo(() => {
+    const start = (sectionsPage - 1) * SECTIONS_PER_PAGE;
+    return sections.slice(start, start + SECTIONS_PER_PAGE);
+  }, [sections, sectionsPage]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -223,42 +231,72 @@ export function SectionsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {state === "loading" && !sections.length ? (
-          <Card className="border-border/70 bg-card/80">
-            <CardContent className="p-6 text-sm text-muted-foreground">Загружаем секции…</CardContent>
-          </Card>
-        ) : (
-          sections.length ? (
-            sections.map(section => (
-              <Card key={section.id} className="border-border/70 bg-card/80">
-                <CardHeader className="space-y-2">
-                  <CardTitle className="text-lg">{section.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {section.category?.name || "Категория не указана"}
-                  </p>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground space-y-2">
-                  <p>{section.conference?.title || "Конференция не указана"}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => startEdit(section)}>
-                      Редактировать
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => deleteSection(section.id)}>
-                      Удалить
-                    </Button>
-                  </div>
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          {state === "loading" && !sections.length ? (
+            <Card className="border-border/70 bg-card/80">
+              <CardContent className="p-6 text-sm text-muted-foreground">Загружаем секции…</CardContent>
+            </Card>
+          ) : (
+            sections.length ? (
+              paginatedSections.map(section => (
+                <Card key={section.id} className="border-border/70 bg-card/80">
+                  <CardHeader className="space-y-2">
+                    <CardTitle className="text-lg">{section.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {section.category?.name || "Категория не указана"}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground space-y-2">
+                    <p>{section.conference?.title || "Конференция не указана"}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => startEdit(section)}>
+                        Редактировать
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => deleteSection(section.id)}>
+                        Удалить
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border-border/70 bg-card/80">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Секций пока нет. Создайте первую запись.
                 </CardContent>
               </Card>
-            ))
-          ) : (
-            <Card className="border-border/70 bg-card/80">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                Секций пока нет. Создайте первую запись.
-              </CardContent>
-            </Card>
-          )
-        )}
+            )
+          )}
+        </div>
+        {sections.length > SECTIONS_PER_PAGE ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>
+              Показано {paginatedSections.length} из {sections.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={sectionsPage <= 1}
+                onClick={() => setSectionsPage(p => Math.max(1, p - 1))}
+              >
+                Назад
+              </Button>
+              <span>
+                {sectionsPage} / {sectionsTotalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={sectionsPage >= sectionsTotalPages}
+                onClick={() => setSectionsPage(p => Math.min(sectionsTotalPages, p + 1))}
+              >
+                Вперёд
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

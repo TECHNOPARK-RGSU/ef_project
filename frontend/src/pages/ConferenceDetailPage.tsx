@@ -3,11 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL, fetchList, fetchOne } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
+import { isStudentRole as checkStudentRole } from "@/lib/roles";
 import type {
   Conference,
   ConferenceExpert,
-  ConferenceStageAvailability,
-  ConferenceStatusFlowItem,
   EvaluationCriterion,
   ProjectResult,
   Section,
@@ -24,6 +23,9 @@ export function ConferenceDetailPage() {
   const authUser = getAuthUserInfo();
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isOrganizerRole = roleCode === "organizer";
+  const isExpertRole = roleCode === "expert";
+  const isTutorRole = roleCode === "tutor";
+  const isStudentRole = checkStudentRole(roleCode);
   const [, params] = useRoute("/conferences/:id");
   const id = params?.id ? Number(params.id) : null;
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -33,10 +35,6 @@ export function ConferenceDetailPage() {
   const [results, setResults] = useState<ProjectResult[]>([]);
   const [criteriaMessage, setCriteriaMessage] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
-  const [statusFlowItems, setStatusFlowItems] = useState<ConferenceStatusFlowItem[]>([]);
-  const [stageItems, setStageItems] = useState<ConferenceStageAvailability[]>([]);
-  const [statusFlowMessage, setStatusFlowMessage] = useState<string | null>(null);
-  const [stageMessage, setStageMessage] = useState<string | null>(null);
   const [conferenceExperts, setConferenceExperts] = useState<ConferenceExpert[]>([]);
   const [expertUsers, setExpertUsers] = useState<User[]>([]);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
@@ -53,6 +51,7 @@ export function ConferenceDetailPage() {
   });
   const [editingCriterionId, setEditingCriterionId] = useState<number | null>(null);
   const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
+  const [criteriaPage, setCriteriaPage] = useState(1);
 
   useEffect(() => {
     if (!id) return;
@@ -89,18 +88,6 @@ export function ConferenceDetailPage() {
         fetchList<EvaluationCriterion>(`/api/conf/criteria/?conference=${id}`, controller.signal),
         fetchList<ProjectResult>(`/api/conf/results/?conference=${id}`, controller.signal),
         isOrganizerRole
-          ? fetchList<ConferenceStatusFlowItem>(
-              `/api/conf/conference-status-flow/?conference=${id}`,
-              controller.signal,
-            )
-          : Promise.resolve([] as ConferenceStatusFlowItem[]),
-        isOrganizerRole
-          ? fetchList<ConferenceStageAvailability>(
-              `/api/conf/conference-stages/?conference=${id}`,
-              controller.signal,
-            )
-          : Promise.resolve([] as ConferenceStageAvailability[]),
-        isOrganizerRole
           ? fetchList<ConferenceExpert>(`/api/conf/conference-experts/?conference=${id}`, controller.signal)
           : Promise.resolve([] as ConferenceExpert[]),
         isOrganizerRole ? fetchList<User>(`/api/users/users/`, controller.signal) : Promise.resolve([] as User[]),
@@ -108,10 +95,8 @@ export function ConferenceDetailPage() {
       if (controller.signal.aborted) return;
       if (tasks[0].status === "fulfilled") setCriteria(tasks[0].value);
       if (tasks[1].status === "fulfilled") setResults(tasks[1].value);
-      if (tasks[2].status === "fulfilled") setStatusFlowItems(tasks[2].value);
-      if (tasks[3].status === "fulfilled") setStageItems(tasks[3].value);
-      if (tasks[4].status === "fulfilled") setConferenceExperts(tasks[4].value);
-      if (tasks[5].status === "fulfilled") setExpertUsers(tasks[5].value);
+      if (tasks[2].status === "fulfilled") setConferenceExperts(tasks[2].value);
+      if (tasks[3].status === "fulfilled") setExpertUsers(tasks[3].value);
     };
     loadMeta();
     return () => controller.abort();
@@ -133,16 +118,12 @@ export function ConferenceDetailPage() {
     if (!sections.length) return [];
     return sections.filter(section => section.conference?.id === id);
   }, [sections, id]);
-  const orderedStatusFlow = useMemo(() => {
-    return [...statusFlowItems].sort((a, b) => a.order - b.order);
-  }, [statusFlowItems]);
-  const orderedStageItems = useMemo(() => {
-    return [...stageItems].sort((a, b) => {
-      const aName = a.stage?.name ?? "";
-      const bName = b.stage?.name ?? "";
-      return aName.localeCompare(bName);
-    });
-  }, [stageItems]);
+  const CRITERIA_PER_PAGE = 8;
+  const criteriaTotalPages = Math.max(1, Math.ceil(criteria.length / CRITERIA_PER_PAGE));
+  const paginatedCriteria = useMemo(() => {
+    const start = (criteriaPage - 1) * CRITERIA_PER_PAGE;
+    return criteria.slice(start, start + CRITERIA_PER_PAGE);
+  }, [criteria, criteriaPage]);
   const availableExperts = useMemo(() => {
     return expertUsers.filter(user => (user.role?.code ?? "").toLowerCase() === "expert");
   }, [expertUsers]);
@@ -187,59 +168,6 @@ export function ConferenceDetailPage() {
     setCriteriaMessage(editingCriterionId ? "Критерий обновлен." : "Критерий добавлен.");
     setEditingCriterionId(null);
     setIsCriteriaModalOpen(false);
-  };
-
-  const updateStatusFlowItem = async (
-    itemId: number,
-    updates: Partial<Pick<ConferenceStatusFlowItem, "is_enabled" | "order">>,
-  ) => {
-    setStatusFlowMessage(null);
-    const token = getAuthToken();
-    if (!token) {
-      setStatusFlowMessage("Нужен токен для обновления воронки.");
-      return;
-    }
-    const response = await fetch(`${API_BASE_URL}/api/conf/conference-status-flow/${itemId}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-      body: JSON.stringify(updates),
-    });
-    if (!response.ok) {
-      setStatusFlowMessage("Не удалось обновить воронку.");
-      return;
-    }
-    const updated = (await response.json()) as ConferenceStatusFlowItem;
-    setStatusFlowItems(current => current.map(item => (item.id === itemId ? updated : item)));
-  };
-
-  const swapStatusFlowOrder = async (fromId: number, toId: number) => {
-    const from = statusFlowItems.find(item => item.id === fromId);
-    const to = statusFlowItems.find(item => item.id === toId);
-    if (!from || !to) return;
-    await Promise.all([
-      updateStatusFlowItem(from.id, { order: to.order }),
-      updateStatusFlowItem(to.id, { order: from.order }),
-    ]);
-  };
-
-  const toggleStageItem = async (itemId: number, isEnabled: boolean) => {
-    setStageMessage(null);
-    const token = getAuthToken();
-    if (!token) {
-      setStageMessage("Нужен токен для обновления этапов.");
-      return;
-    }
-    const response = await fetch(`${API_BASE_URL}/api/conf/conference-stages/${itemId}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-      body: JSON.stringify({ is_enabled: isEnabled }),
-    });
-    if (!response.ok) {
-      setStageMessage("Не удалось обновить этапы.");
-      return;
-    }
-    const updated = (await response.json()) as ConferenceStageAvailability;
-    setStageItems(current => current.map(item => (item.id === itemId ? updated : item)));
   };
 
   const saveConferenceExpert = async () => {
@@ -404,9 +332,35 @@ export function ConferenceDetailPage() {
               : "Даты уточняются"}
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/conferences">Назад к списку</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {id ? (
+            <>
+              {(isOrganizerRole || isTutorRole || isStudentRole) ? (
+                <Button variant="outline" asChild>
+                  <Link href={`/conferences/${id}/projects`}>Заявки</Link>
+                </Button>
+              ) : null}
+              {(isOrganizerRole || isExpertRole) ? (
+                <Button variant="outline" asChild>
+                  <Link href={`/conferences/${id}/assignments`}>Назначения</Link>
+                </Button>
+              ) : null}
+              {(isOrganizerRole || isExpertRole) ? (
+                <Button variant="outline" asChild>
+                  <Link href={`/conferences/${id}/scores`}>Оценки</Link>
+                </Button>
+              ) : null}
+              {(isOrganizerRole || isExpertRole || isTutorRole) ? (
+                <Button variant="outline" asChild>
+                  <Link href={`/conferences/${id}/comments`}>Комментарии</Link>
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+          <Button variant="outline" asChild>
+            <Link href="/conferences">Назад к списку</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
@@ -481,8 +435,8 @@ export function ConferenceDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="space-y-2">
-              {criteria.length ? (
-                criteria.map(criterion => (
+              {paginatedCriteria.length ? (
+                paginatedCriteria.map(criterion => (
                   <div key={criterion.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                     <p className="font-semibold text-foreground">{criterion.name}</p>
                     <p>Этап: {criterion.stage === "online" ? "заочный" : "очный"}</p>
@@ -513,6 +467,34 @@ export function ConferenceDetailPage() {
                 <p>Критерии пока не заданы.</p>
               )}
             </div>
+            {criteria.length > CRITERIA_PER_PAGE ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-muted-foreground">
+                <span>
+                  Показано {paginatedCriteria.length} из {criteria.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={criteriaPage <= 1}
+                    onClick={() => setCriteriaPage(p => Math.max(1, p - 1))}
+                  >
+                    Назад
+                  </Button>
+                  <span>
+                    {criteriaPage} / {criteriaTotalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={criteriaPage >= criteriaTotalPages}
+                    onClick={() => setCriteriaPage(p => Math.min(criteriaTotalPages, p + 1))}
+                  >
+                    Вперёд
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -531,7 +513,7 @@ export function ConferenceDetailPage() {
               <p>Результаты будут доступны после расчёта.</p>
             )}
             <Button variant="outline" asChild>
-              <Link href="/scores">Перейти к оценкам</Link>
+              <Link href={id ? `/conferences/${id}/scores` : "/scores"}>Перейти к оценкам</Link>
             </Button>
           </CardContent>
         </Card>
@@ -690,81 +672,6 @@ export function ConferenceDetailPage() {
                   Отмена
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
-
-      {isOrganizerRole ? (
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border-border/70 bg-card/80">
-            <CardHeader>
-              <CardTitle className="text-lg">Воронка статусов</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {orderedStatusFlow.length ? (
-                orderedStatusFlow.map((item, index) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background/70 p-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={item.is_enabled}
-                        onChange={event => updateStatusFlowItem(item.id, { is_enabled: event.target.checked })}
-                      />
-                      <span>{item.status?.name ?? "Без названия"}</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={index === 0}
-                        onClick={() => {
-                          const targetId = orderedStatusFlow[index - 1]?.id;
-                          if (targetId) swapStatusFlowOrder(item.id, targetId);
-                        }}
-                      >
-                        Вверх
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={index === orderedStatusFlow.length - 1}
-                        onClick={() => {
-                          const targetId = orderedStatusFlow[index + 1]?.id;
-                          if (targetId) swapStatusFlowOrder(item.id, targetId);
-                        }}
-                      >
-                        Вниз
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p>Статусы загрузятся после создания конференции.</p>
-              )}
-              {statusFlowMessage ? <p>{statusFlowMessage}</p> : null}
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 bg-card/80">
-            <CardHeader>
-              <CardTitle className="text-lg">Этапы участия</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {orderedStageItems.length ? (
-                orderedStageItems.map(item => (
-                  <label key={item.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-background/70 p-2">
-                    <input
-                      type="checkbox"
-                      checked={item.is_enabled}
-                      onChange={event => toggleStageItem(item.id, event.target.checked)}
-                    />
-                    <span>{item.stage?.name ?? "Этап"}</span>
-                  </label>
-                ))
-              ) : (
-                <p>Этапы загрузятся после создания конференции.</p>
-              )}
-              {stageMessage ? <p>{stageMessage}</p> : null}
             </CardContent>
           </Card>
         </div>

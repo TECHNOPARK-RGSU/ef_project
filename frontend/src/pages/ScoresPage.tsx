@@ -7,8 +7,11 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type { EvaluationCriterion, Project, ProjectScore, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
 
 export function ScoresPage() {
+  const [, paramsFromRoute] = useRoute("/conferences/:id/scores");
+  const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const authUser = getAuthUserInfo();
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isOrganizerRole = roleCode === "organizer";
@@ -21,6 +24,9 @@ export function ScoresPage() {
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("all");
+  useEffect(() => {
+    if (conferenceIdFromRoute != null) setConferenceFilter(String(conferenceIdFromRoute));
+  }, [conferenceIdFromRoute]);
   const [sectionFilter, setSectionFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [evaluatorFilter, setEvaluatorFilter] = useState("all");
@@ -196,7 +202,14 @@ export function ScoresPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">оценки</p>
           <h1 className="text-3xl font-semibold">Оценки проектов</h1>
         </div>
-        <Button onClick={openCreateScore}>Создать оценку</Button>
+        <div className="flex items-center gap-2">
+          {conferenceIdFromRoute != null ? (
+            <Button variant="outline" asChild>
+              <Link href={`/conferences/${conferenceIdFromRoute}`}>← К конференции</Link>
+            </Button>
+          ) : null}
+          <Button onClick={openCreateScore}>Создать оценку</Button>
+        </div>
       </div>
 
       {isScoreModalOpen ? (
@@ -316,19 +329,25 @@ export function ScoresPage() {
           </div>
           <div className="space-y-2">
             <Label>Конференция</Label>
-            <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Все конференции" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все конференции</SelectItem>
-                {conferenceOptions.map(conf => (
-                  <SelectItem key={conf.id} value={String(conf.id)}>
-                    {conf.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {conferenceIdFromRoute != null ? (
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+                {conferenceOptions.find(c => c.id === conferenceIdFromRoute)?.title ?? String(conferenceIdFromRoute)}
+              </div>
+            ) : (
+              <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Все конференции" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все конференции</SelectItem>
+                  {conferenceOptions.map(conf => (
+                    <SelectItem key={conf.id} value={String(conf.id)}>
+                      {conf.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Секция</Label>
