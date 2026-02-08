@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { clearAuthToken, getAuthToken } from "@/lib/auth";
+import { getRoleLabel, isStudentRole, normalizeRoleCode } from "@/lib/roles";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
@@ -7,7 +8,8 @@ import projectarisLogo from "@/assets/projectaris-logo.svg";
 type NavItem = { label: string; href: string };
 
 function getNavItems(roleCode: string): NavItem[] {
-  if (roleCode === "organizer") {
+  const normalizedRole = normalizeRoleCode(roleCode);
+  if (normalizedRole === "organizer") {
     return [
       { label: "Главная", href: "/" },
       { label: "Конференции", href: "/conferences" },
@@ -20,7 +22,7 @@ function getNavItems(roleCode: string): NavItem[] {
       { label: "Справочники", href: "/catalogs" },
     ];
   }
-  if (roleCode === "expert") {
+  if (normalizedRole === "expert") {
     return [
       { label: "Главная", href: "/" },
       { label: "Назначения", href: "/assignments" },
@@ -28,7 +30,7 @@ function getNavItems(roleCode: string): NavItem[] {
       { label: "Комментарии", href: "/comments" },
     ];
   }
-  if (roleCode === "tutor" || roleCode === "student" || roleCode === "student2" || roleCode === "student3") {
+  if (normalizedRole === "tutor" || isStudentRole(normalizedRole)) {
     return [
       { label: "Главная", href: "/" },
       { label: "Мои проекты", href: "/apply" },
@@ -40,7 +42,7 @@ function getNavItems(roleCode: string): NavItem[] {
 export function SiteLayout({ children, roleCode = "" }: { children: React.ReactNode; roleCode?: string }) {
   const [token, setToken] = useState(() => getAuthToken());
   const [location] = useLocation();
-  const normalizedRole = roleCode.toLowerCase();
+  const normalizedRole = normalizeRoleCode(roleCode);
   const navItems = getNavItems(normalizedRole);
   const roleLabel =
     normalizedRole === "organizer"
@@ -49,8 +51,8 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
         ? "Эксперт"
         : normalizedRole === "tutor"
           ? "Наставник"
-          : normalizedRole === "student" || normalizedRole === "student2" || normalizedRole === "student3"
-            ? "Ученик"
+          : isStudentRole(normalizedRole)
+            ? getRoleLabel({ code: normalizedRole, name: "Ученик" })
             : "";
 
   const handleLogout = () => {
@@ -68,7 +70,7 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
             <img src={projectarisLogo} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">projectaris</p>
-              <p className="text-base font-semibold md:text-lg">Платформа конференций</p>
+              <p className="text-base font-semibold md:text-lg">Projectaris</p>
             </div>
           </Link>
           {token ? (
@@ -145,7 +147,7 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
 
       <footer className="border-t border-border/70 bg-background/70 py-10">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-          <p>EF Platform • Учебный проект для конференций</p>
+          <p>Projectaris • Учебный проект для конференций</p>
           <div className="flex flex-wrap gap-4">
             <span>Политика</span>
             <span>Контакты</span>

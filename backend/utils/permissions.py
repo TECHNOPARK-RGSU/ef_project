@@ -1,12 +1,6 @@
-from typing import Iterable
-
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-
-def _normalize_roles(roles: Iterable[str] | None) -> set[str]:
-    if not roles:
-        return set()
-    return {role.lower() for role in roles}
+from utils.roles import normalize_role_code, normalize_role_set
 
 
 class RoleBasedPermission(BasePermission):
@@ -37,10 +31,10 @@ class RoleBasedPermission(BasePermission):
             }.get(request.method)
 
         role_requirements = getattr(view, "role_requirements", {})
-        allowed_roles = _normalize_roles(role_requirements.get(action))
+        allowed_roles = normalize_role_set(role_requirements.get(action))
         if not allowed_roles:
             return True
 
         role = getattr(user, "role", None)
-        role_code = getattr(role, "code", "").lower()
+        role_code = normalize_role_code(getattr(role, "code", ""))
         return role_code in allowed_roles

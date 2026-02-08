@@ -70,8 +70,6 @@ class Command(BaseCommand):
             "expert": ("Эксперт", "expert"),
             "tutor": ("Наставник", "tutor"),
             "student": ("Ученик", "student"),
-            "student2": ("Ученик 2", "student2"),
-            "student3": ("Ученик 3", "student3"),
         }
         roles: dict[str, Role] = {}
         for key, (name, code) in role_map.items():
@@ -245,7 +243,7 @@ class Command(BaseCommand):
                 )
             )
 
-        student_roles = [roles["student"], roles["student2"], roles["student3"]]
+        student_roles = [roles["student"]]
         for idx, payload in enumerate(students_data):
             users["students"].append(
                 self._get_or_create_user(

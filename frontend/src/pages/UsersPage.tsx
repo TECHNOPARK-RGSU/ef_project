@@ -1,56 +1,27 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserModal } from "@/components/users/UserModal";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
+import { getRoleLabel } from "@/lib/roles";
 import type { EducationalOrganization, Role, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { Link } from "wouter";
 
-type UsersPageProps = {
-  initialEditingId?: number | null;
-  isEditPage?: boolean;
-};
-
-function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps) {
-  const [, setLocation] = useLocation();
+export function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [initialEditHandled, setInitialEditHandled] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [orgs, setOrgs] = useState<EducationalOrganization[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    lastName: "",
-    firstName: "",
-    email: "",
-    password: "",
-    roleId: "",
-    orgId: "none",
-  });
-  const normalizeRoleName = (role?: Role | null) => {
-    const code = (role?.code ?? "").toLowerCase();
-    if (code === "student" || code === "student2" || code === "student3") {
-      return "Ученик";
-    }
-    return role?.name || "Без роли";
-  };
-
-  const roleOptions = useMemo(() => {
-    const findByCode = (code: string) => roles.find(role => role.code.toLowerCase() === code);
-    const studentRole = findByCode("student") ?? findByCode("student2") ?? findByCode("student3");
-    const nonStudents = roles.filter(
-      role => !["student", "student2", "student3"].includes(role.code.toLowerCase()),
-    );
-    return studentRole ? [studentRole, ...nonStudents] : nonStudents;
-  }, [roles]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoadState("loading");
     Promise.allSettled([
       fetchList<Role>("/api/users/roles/", controller.signal),
       fetchList<EducationalOrganization>("/api/users/educational-organizations/", controller.signal),
@@ -60,94 +31,10 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
       if (results[0].status === "fulfilled") setRoles(results[0].value);
       if (results[1].status === "fulfilled") setOrgs(results[1].value);
       if (results[2].status === "fulfilled") setUsers(results[2].value);
+      setLoadState(results.every(result => result.status === "fulfilled") ? "ready" : "error");
     });
     return () => controller.abort();
   }, []);
-
-  const submitUser = async () => {
-    setMessage(null);
-    const isCreate = !editingId;
-    if (!form.lastName.trim() || !form.firstName.trim() || !form.roleId) {
-      setMessage("Заполните фамилию, имя и роль.");
-      return;
-    }
-    if (isCreate && !form.email.trim()) {
-      setMessage("Для создания пользователя нужен email.");
-      return;
-    }
-    const token = getAuthToken();
-    if (!token) {
-      setMessage("Нужен токен организатора.");
-      return;
-    }
-    const endpoint = editingId ? `/api/users/users/${editingId}/` : "/api/users/users/";
-    const payload: Record<string, unknown> = {
-      last_name: form.lastName,
-      first_name: form.firstName,
-      role_id: Number(form.roleId),
-      educational_organization_id: form.orgId === "none" ? null : Number(form.orgId),
-    };
-    if (form.email.trim()) payload.email = form.email.trim();
-    if (form.password.trim()) payload.password = form.password.trim();
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: editingId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      let details = "Не удалось сохранить пользователя.";
-      try {
-        const data = (await response.json()) as Record<string, string[] | string>;
-        const errors = Object.values(data)
-          .flatMap(value => (Array.isArray(value) ? value : [value]))
-          .filter(Boolean)
-          .join(" ");
-        if (errors) details = errors;
-      } catch {
-        // ignore parsing errors
-      }
-      if (response.status === 403) {
-        details = "Недостаточно прав для изменения пользователей.";
-      }
-      setMessage(details);
-      return;
-    }
-    const created = (await response.json()) as User;
-    setUsers(current =>
-      editingId ? current.map(user => (user.id === editingId ? created : user)) : [created, ...current],
-    );
-    setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
-    setEditingId(null);
-    setMessage(editingId ? "Пользователь обновлен." : "Пользователь создан.");
-    setIsModalOpen(false);
-    if (isEditPage) {
-      setLocation("/users");
-    }
-  };
-
-  const startEdit = (user: User) => {
-    setEditingId(user.id);
-    setForm({
-      lastName: user.last_name ?? "",
-      firstName: user.first_name ?? "",
-      email: user.email ?? "",
-      password: "",
-      roleId: user.role?.id ? String(user.role.id) : "",
-      orgId: user.educational_organization?.id ? String(user.educational_organization.id) : "none",
-    });
-    setIsModalOpen(true);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
-    setIsModalOpen(false);
-    setMessage(null);
-    if (isEditPage) {
-      setLocation("/users");
-    }
-  };
 
   const deleteUser = async (id: number) => {
     setMessage(null);
@@ -165,7 +52,6 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
       return;
     }
     setUsers(current => current.filter(user => user.id !== id));
-    if (editingId === id) cancelEdit();
     setMessage("Пользователь удален.");
   };
 
@@ -181,7 +67,7 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
         user.last_name,
         user.first_name,
         user.email,
-        normalizeRoleName(user.role),
+        getRoleLabel(user.role),
         user.educational_organization?.short_name,
         user.educational_organization?.name,
       ]
@@ -194,49 +80,43 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
 
   const groupedUsers = useMemo(() => {
     return filteredUsers.reduce<Record<string, User[]>>((acc, user) => {
-      const key = normalizeRoleName(user.role);
+      const key = getRoleLabel(user.role);
       if (!acc[key]) acc[key] = [];
       acc[key].push(user);
       return acc;
     }, {});
   }, [filteredUsers]);
 
-  useEffect(() => {
-    if (!initialEditingId || initialEditHandled) return;
-    if (!users.length) return;
-    const target = users.find(user => user.id === initialEditingId);
-    if (target) {
-      startEdit(target);
-      setInitialEditHandled(true);
-    } else {
-      setMessage("Пользователь для редактирования не найден.");
-      setInitialEditHandled(true);
-    }
-  }, [initialEditingId, initialEditHandled, users]);
-
   const openCreateModal = () => {
-    setEditingId(null);
-    setForm({ lastName: "", firstName: "", email: "", password: "", roleId: "", orgId: "none" });
+    setEditingUser(null);
     setIsModalOpen(true);
     setMessage(null);
   };
 
   const openEditModal = (user: User) => {
-    startEdit(user);
-    if (!isEditPage) {
-      setLocation(`/users/${user.id}`);
-    }
+    setEditingUser(user);
+    setIsModalOpen(true);
+    setMessage(null);
+  };
+
+  const handleSaved = (user: User, isCreate: boolean) => {
+    setUsers(current => (isCreate ? [user, ...current] : current.map(item => (item.id === user.id ? user : item))));
+    setMessage(isCreate ? "Пользователь создан." : "Пользователь обновлен.");
+    setEditingUser(null);
+    setIsModalOpen(false);
   };
 
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">пользователи</p>
-        <h1 className="text-3xl font-semibold">Управление пользователями</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">пользователи</p>
+          <h1 className="text-3xl font-semibold">Управление пользователями</h1>
         </div>
         <Button onClick={openCreateModal}>Создать пользователя</Button>
       </div>
+
+      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         <Card className="border-border/70 bg-card/80">
@@ -245,7 +125,6 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="space-y-2">
-              <Label>Поиск</Label>
               <Input
                 placeholder="Имя, email, роль или организация"
                 value={searchQuery}
@@ -261,7 +140,11 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
             <CardTitle className="text-lg">Список пользователей</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            {filteredUsers.length ? (
+            {loadState === "loading" ? (
+              <p>Загружаем пользователей…</p>
+            ) : loadState === "error" ? (
+              <p>Не удалось загрузить пользователей.</p>
+            ) : filteredUsers.length ? (
               Object.entries(groupedUsers).map(([group, groupUsers]) => (
                 <div key={group} className="space-y-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{group}</p>
@@ -272,10 +155,13 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
                           {user.last_name} {user.first_name}
                         </p>
                         <p>{user.email || "Email не указан"}</p>
-                        <p>Роль: {normalizeRoleName(user.role)}</p>
+                        <p>Роль: {getRoleLabel(user.role)}</p>
                         <p>{user.educational_organization?.short_name || "Организация не указана"}</p>
                         <div className="flex flex-wrap gap-2 pt-2">
-                          <Button size="sm" variant="secondary" onClick={() => openEditModal(user)}>
+                          <Button size="sm" variant="secondary" asChild>
+                            <Link href={`/users/${user.id}`}>Открыть</Link>
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => openEditModal(user)}>
                             Редактировать
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => deleteUser(user.id)}>
@@ -288,102 +174,23 @@ function UsersPageBase({ initialEditingId, isEditPage = false }: UsersPageProps)
                 </div>
               ))
             ) : (
-              <p>Пользователи не найдены.</p>
+              <p>Ничего не найдено.</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl rounded-lg border border-border/60 bg-card p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                {editingId ? "Редактирование пользователя" : "Создать пользователя"}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                Закрыть
-              </Button>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
-              <div className="space-y-2">
-                <Label>Фамилия</Label>
-                <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Имя</Label>
-                <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Пароль</Label>
-                <Input
-                  type="password"
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Роль</Label>
-                <Select value={form.roleId || undefined} onValueChange={value => setForm({ ...form, roleId: value })}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Выберите роль" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.length ? (
-                      roleOptions.map(role => (
-                        <SelectItem key={role.id} value={String(role.id)}>
-                          {normalizeRoleName(role)}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="0" disabled>
-                        Нет ролей
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Организация</Label>
-                <Select value={form.orgId} onValueChange={value => setForm({ ...form, orgId: value })}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Опционально" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Без организации</SelectItem>
-                    {orgs.map(org => (
-                      <SelectItem key={org.id} value={String(org.id)}>
-                        {org.short_name || org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {message ? <p className="mt-3 text-sm text-muted-foreground">{message}</p> : null}
-            <div className="mt-4 flex items-center gap-2">
-              <Button onClick={submitUser}>{editingId ? "Сохранить" : "Создать"}</Button>
-              <Button variant="outline" onClick={cancelEdit}>
-                Отмена
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <UserModal
+        open={isModalOpen}
+        roles={roles}
+        orgs={orgs}
+        initialUser={editingUser}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingUser(null);
+        }}
+        onSaved={handleSaved}
+      />
     </section>
   );
-}
-
-export function UsersPage() {
-  return <UsersPageBase />;
-}
-
-export function UsersEditPage() {
-  const [, params] = useRoute("/users/:id");
-  const id = params?.id ? Number(params.id) : null;
-  return <UsersPageBase initialEditingId={id} isEditPage />;
 }

@@ -40,7 +40,7 @@ export function ScoresPage() {
     const unique = new Map<string, EvaluationCriterion>();
     criteria.forEach(item => {
       if (item.conference?.id !== conferenceId) return;
-      const key = `${item.name}-${item.stage}`;
+      const key = `${item.name.trim().toLowerCase()}-${item.stage}-${conferenceId}`;
       if (!unique.has(key)) unique.set(key, item);
     });
     return Array.from(unique.values());

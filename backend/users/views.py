@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from users.models import EducationalOrganization, Role, User
+from utils.roles import is_student_role, normalize_role_code
 from users.serializers import (
     EducationalOrganizationSerializer,
     RegistrationSerializer,
@@ -51,6 +52,10 @@ class RoleViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.exclude(code__iexact="student2").exclude(code__iexact="student3")
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet для пользователей."""    
@@ -81,7 +86,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         if role_code == "tutor":
@@ -91,7 +96,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 | Q(role__code__iexact="student2")
                 | Q(role__code__iexact="student3")
             )
-        if role_code in {"expert", "student", "student2", "student3"}:
+        if role_code == "expert" or is_student_role(role_code):
             return queryset.filter(id=user.id)
         return queryset.none()
 

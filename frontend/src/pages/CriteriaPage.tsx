@@ -200,18 +200,27 @@ export function CriteriaPage() {
             <Label>Название</Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             {suggestions.length ? (
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                {suggestions.map(suggestion => (
-                  <Button
-                    key={suggestion}
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => setForm(current => ({ ...current, name: suggestion }))}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Популярные критерии</p>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  {suggestions.map(suggestion => (
+                    <Button
+                      key={suggestion}
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setForm(current =>
+                          current.name.trim().toLowerCase() === suggestion.toLowerCase()
+                            ? current
+                            : { ...current, name: suggestion },
+                        )
+                      }
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>

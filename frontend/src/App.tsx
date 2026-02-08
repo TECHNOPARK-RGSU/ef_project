@@ -12,12 +12,14 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SectionsPage } from "@/pages/SectionsPage";
 import { ScoresPage } from "@/pages/ScoresPage";
-import { UsersEditPage, UsersPage } from "@/pages/UsersPage";
+import { UserDetailPage } from "@/pages/UserDetailPage";
+import { UsersPage } from "@/pages/UsersPage";
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { clearAuthToken, getAuthToken, getAuthUserInfo, setAuthUserInfo, type AuthUserInfo } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
+import { isStudentRole, normalizeRoleCode } from "@/lib/roles";
 import "./index.css";
 
 export function App() {
@@ -77,11 +79,11 @@ export function App() {
     };
   }, [setLocation, token]);
 
-  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
+  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
   const isOrganizer = roleCode === "organizer";
   const isExpert = roleCode === "expert";
   const isTutor = roleCode === "tutor";
-  const isStudent = roleCode === "student" || roleCode === "student2" || roleCode === "student3";
+  const isStudent = isStudentRole(roleCode);
 
   const defaultPath = useMemo(() => {
     if (isOrganizer) return "/conferences";
@@ -148,7 +150,7 @@ export function App() {
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/users/:id" component={UsersEditPage} /> : null}
+          {canAccessAdminCatalogs ? <Route path="/users/:id" component={UserDetailPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
           {canAccessComments ? <Route path="/comments" component={CommentsPage} /> : null}
           <Route path="/login" component={LoginPage} />

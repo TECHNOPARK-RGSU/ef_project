@@ -28,8 +28,6 @@ class Command(BaseCommand):
             ("Эксперт", "expert"),
             ("Наставник", "tutor"),
             ("Ученик", "student"),
-            ("Ученик 2", "student2"),
-            ("Ученик 3", "student3"),
         ]
         for name, code in roles:
             Role.objects.get_or_create(name=name, code=code)

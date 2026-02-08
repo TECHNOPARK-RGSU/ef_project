@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
+import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type {
   Comment,
   ParticipationStage,
@@ -28,9 +29,8 @@ export function ApplyPage() {
     { code: "final", label: "Финал" },
   ];
   const authUser = getAuthUserInfo();
-  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
-  const isStudentRole =
-    roleCode === "student" || roleCode === "student2" || roleCode === "student3";
+  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
+  const isStudentRole = isStudentRoleCode(roleCode);
   const isTutorRole = roleCode === "tutor";
   const isOrganizerRole = roleCode === "organizer";
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -104,8 +104,8 @@ export function ApplyPage() {
   const studentUsers = useMemo(
     () =>
       users.filter(user => {
-        const code = (user.role?.code ?? "").toLowerCase();
-        return code === "student" || code === "student2" || code === "student3";
+        const code = normalizeRoleCode(user.role?.code ?? "");
+        return isStudentRoleCode(code);
       }),
     [users],
   );

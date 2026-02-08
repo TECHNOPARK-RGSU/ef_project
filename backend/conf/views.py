@@ -2,7 +2,7 @@ import os
 import tempfile
 import zipfile
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from django.http import HttpResponse
 from django.shortcuts import render
 from openpyxl import Workbook
+from utils.roles import is_student_role, normalize_role_code
 from conf.models import (
     Conference,
     AgeCategory,
@@ -100,7 +101,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         return queryset.none()
@@ -364,9 +365,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
     role_requirements = {
-        "create": ["organizer", "tutor", "student", "student2", "student3"],
-        "update": ["organizer", "tutor", "student", "student2", "student3"],
-        "partial_update": ["organizer", "tutor", "student", "student2", "student3"],
+        "create": ["organizer", "tutor", "student"],
+        "update": ["organizer", "tutor", "student"],
+        "partial_update": ["organizer", "tutor", "student"],
         "destroy": ["organizer"],
     }
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -387,7 +388,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         if role_code == "expert":
@@ -396,7 +397,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             ).distinct()
         if role_code == "tutor":
             return queryset.filter(tutor=user)
-        if role_code in {"student", "student2", "student3"}:
+        if is_student_role(role_code):
             return queryset.filter(Q(leader=user) | Q(members=user)).distinct()
         return queryset.none()
 
@@ -408,7 +409,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
     role_requirements = {
-        "create": ["organizer", "expert", "tutor", "student", "student2", "student3"],
+        "create": ["organizer", "expert", "tutor", "student"],
         "update": ["organizer", "expert", "tutor"],
         "partial_update": ["organizer", "expert", "tutor"],
         "destroy": ["organizer"],
@@ -424,7 +425,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         if role_code == "expert":
@@ -433,7 +434,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             ).distinct()
         if role_code == "tutor":
             return queryset.filter(Q(author=user) | Q(project__tutor=user)).distinct()
-        if role_code in {"student", "student2", "student3"}:
+        if is_student_role(role_code):
             return queryset.filter(
                 Q(project__leader=user) | Q(project__members=user)
             ).distinct()
@@ -442,7 +443,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         project = serializer.validated_data["project"]
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
 
         if role_code == "organizer":
             serializer.save()
@@ -453,7 +454,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             allowed = project.expert_assignments.filter(assignment__expert=user).exists()
         elif role_code == "tutor":
             allowed = project.tutor_id == user.id
-        elif role_code in {"student", "student2", "student3"}:
+        elif is_student_role(role_code):
             allowed = project.leader_id == user.id or project.members.filter(id=user.id).exists()
 
         if not allowed:
@@ -485,7 +486,7 @@ class EvaluationCriterionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         if role_code == "expert":
@@ -499,7 +500,12 @@ class EvaluationCriterionViewSet(viewsets.ModelViewSet):
                 if project.section and project.section.conference_id
             }
             if conference_ids:
-                return queryset.filter(conference_id__in=conference_ids).distinct()
+                filtered = queryset.filter(conference_id__in=conference_ids)
+                if connection.vendor == "postgresql":
+                    return filtered.order_by("conference_id", "name", "stage", "id").distinct(
+                        "conference_id", "name", "stage"
+                    )
+                return filtered.distinct()
             return queryset.none()
         return queryset.none()
 
@@ -527,20 +533,20 @@ class ProjectScoreViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "organizer":
             return queryset
         if role_code == "expert":
             return queryset.filter(evaluator=user)
         if role_code == "tutor":
             return queryset.filter(project__tutor=user)
-        if role_code in {"student", "student2", "student3"}:
+        if is_student_role(role_code):
             return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
         return queryset.none()
 
     def perform_create(self, serializer):
         user = self.request.user
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "expert":
             serializer.save(evaluator=user)
             return
@@ -564,12 +570,12 @@ class ProjectResultViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code in {"organizer", "expert"}:
             return queryset
         if role_code == "tutor":
             return queryset.filter(project__tutor=user)
-        if role_code in {"student", "student2", "student3"}:
+        if is_student_role(role_code):
             return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
         return queryset.none()
 
@@ -604,7 +610,7 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "expert":
             return queryset.filter(expert=user)
         if role_code == "organizer":
@@ -615,7 +621,7 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
     def download_zip(self, request, pk=None):
         assignment = self.get_object()
         user = request.user
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "expert" and assignment.expert_id != user.id:
             return Response({"detail": "Forbidden"}, status=403)
 
@@ -665,7 +671,7 @@ class ExpertAssignmentItemViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
-        role_code = getattr(user.role, "code", "").lower()
+        role_code = normalize_role_code(getattr(user.role, "code", ""))
         if role_code == "expert":
             return queryset.filter(assignment__expert=user)
         if role_code == "organizer":

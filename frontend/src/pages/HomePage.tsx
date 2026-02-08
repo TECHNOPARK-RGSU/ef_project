@@ -14,6 +14,7 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
 import { FEATURES, STEPS } from "@/lib/content";
 import { formatDateRange, formatFormat } from "@/lib/format";
+import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type { Conference, ProjectStatus, Role, Section } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -28,8 +29,8 @@ const toTrackCards = (sections: Section[]) =>
 export function HomePage() {
   const authUser = getAuthUserInfo();
   const isGuest = !authUser?.id;
-  const roleCode = (authUser?.roleCode ?? "").toLowerCase();
-  const isStudentRole = roleCode === "student" || roleCode === "student2" || roleCode === "student3";
+  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
+  const isStudentRole = isStudentRoleCode(roleCode);
   const isTutorRole = roleCode === "tutor";
   const isExpertRole = roleCode === "expert";
   const [apiState, setApiState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -39,7 +40,6 @@ export function HomePage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [selectedConference, setSelectedConference] = useState<Conference | null>(null);
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [registerMessage, setRegisterMessage] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     lastName: "",
@@ -47,6 +47,7 @@ export function HomePage() {
     middleName: "",
     email: "",
     password: "",
+    confirmPassword: "",
     phone: "",
     city: "",
   });
@@ -93,7 +94,15 @@ export function HomePage() {
   const visibleConferences = useMemo(() => conferences, [conferences]);
   const visibleTracks = useMemo(() => toTrackCards(sections), [sections]);
   const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(item => item.name), [statuses]);
-  const visibleRoles = useMemo(() => roles.map(role => `${role.name} — ${role.code}`), [roles]);
+  const visibleRoles = useMemo(
+    () =>
+      roles.map(role => {
+        const normalizedCode = normalizeRoleCode(role.code);
+        const label = normalizedCode === "student" ? "Ученик" : role.name;
+        return `${label} — ${normalizedCode}`;
+      }),
+    [roles],
+  );
 
   useEffect(() => {
     if (!selectedConference && visibleConferences.length) {
@@ -115,6 +124,18 @@ export function HomePage() {
     }
     if (!registerForm.password.trim()) {
       setRegisterMessage("Укажите пароль.");
+      return;
+    }
+    if (registerForm.password.length < 6) {
+      setRegisterMessage("Пароль слишком короткий. Минимум 6 символов.");
+      return;
+    }
+    if (registerForm.password !== registerForm.confirmPassword) {
+      setRegisterMessage("Пароли не совпадают.");
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())) {
+      setRegisterMessage("Укажите корректный email.");
       return;
     }
     const response = await fetch(`${API_BASE_URL}/api/users/users/register/`, {
@@ -145,13 +166,14 @@ export function HomePage() {
       setRegisterMessage(details);
       return;
     }
-    setRegisterMessage("Учетная запись создана. Теперь войдите.");
+    setRegisterMessage("Учетная запись создана. Перейдите к входу.");
     setRegisterForm({
       lastName: "",
       firstName: "",
       middleName: "",
       email: "",
       password: "",
+      confirmPassword: "",
       phone: "",
       city: "",
     });
@@ -222,7 +244,7 @@ export function HomePage() {
       <section className="grid gap-10 md:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6 animate-rise">
           <p className="inline-flex items-center gap-2 rounded-full bg-card px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground shadow-sm">
-            учебная платформа
+            projectaris
           </p>
           <h1 className="text-4xl font-semibold leading-tight text-balance md:text-5xl">
             Управляйте очными и заочными конференциями без лишних табличек
@@ -238,11 +260,6 @@ export function HomePage() {
             <Button size="lg" variant="outline" asChild>
               <a href="#events">К событиям</a>
             </Button>
-            {isGuest ? (
-              <Button size="lg" variant="secondary" onClick={() => setIsRegisterModalOpen(true)}>
-                Регистрация
-              </Button>
-            ) : null}
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {stats.map(item => (
@@ -256,35 +273,117 @@ export function HomePage() {
           </div>
         </div>
 
-        <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
-          <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
-          <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Ближайшая конференция</CardTitle>
-            <p className="text-sm text-muted-foreground">Подготовка к весенней сессии</p>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="rounded-xl border border-border/60 bg-background/70 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">24–26 апреля</p>
-              <p className="mt-2 text-lg font-semibold">Межвузовские дни науки</p>
-              <p className="mt-2 text-sm text-muted-foreground">Очный формат + онлайн-доклады</p>
-            </div>
-            <div className="space-y-3">
-              {["Открыть секции", "Назначить экспертов", "Сформировать протокол"].map(item => (
-                <div
-                  key={item}
-                  className="flex items-center justify-between rounded-lg border border-border/60 bg-background/80 px-4 py-3 text-sm"
-                >
-                  <span>{item}</span>
-                  <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">готово</span>
+        {isGuest ? (
+          <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
+            <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
+            <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl">Регистрация участника</CardTitle>
+              <p className="text-sm text-muted-foreground">Роль автоматически установится как «участник».</p>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Фамилия</Label>
+                  <Input
+                    value={registerForm.lastName}
+                    onChange={event => setRegisterForm(current => ({ ...current, lastName: event.target.value }))}
+                  />
                 </div>
-              ))}
-            </div>
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/conferences">Перейти к настройкам</Link>
-            </Button>
-          </CardContent>
-        </Card>
+                <div className="space-y-2">
+                  <Label>Имя</Label>
+                  <Input
+                    value={registerForm.firstName}
+                    onChange={event => setRegisterForm(current => ({ ...current, firstName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Отчество</Label>
+                  <Input
+                    value={registerForm.middleName}
+                    onChange={event => setRegisterForm(current => ({ ...current, middleName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    value={registerForm.email}
+                    onChange={event => setRegisterForm(current => ({ ...current, email: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Пароль</Label>
+                  <Input
+                    type="password"
+                    value={registerForm.password}
+                    onChange={event => setRegisterForm(current => ({ ...current, password: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Повтор пароля</Label>
+                  <Input
+                    type="password"
+                    value={registerForm.confirmPassword}
+                    onChange={event =>
+                      setRegisterForm(current => ({ ...current, confirmPassword: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Телефон</Label>
+                  <Input
+                    value={registerForm.phone}
+                    onChange={event => setRegisterForm(current => ({ ...current, phone: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Город</Label>
+                  <Input
+                    value={registerForm.city}
+                    onChange={event => setRegisterForm(current => ({ ...current, city: event.target.value }))}
+                  />
+                </div>
+              </div>
+              {registerMessage ? <p>{registerMessage}</p> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={submitRegistration}>Создать аккаунт</Button>
+                <Button variant="outline" asChild>
+                  <Link href="/login">Уже есть аккаунт</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
+            <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
+            <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl">Ближайшая конференция</CardTitle>
+              <p className="text-sm text-muted-foreground">Подготовка к весенней сессии</p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="rounded-xl border border-border/60 bg-background/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">24–26 апреля</p>
+                <p className="mt-2 text-lg font-semibold">Межвузовские дни науки</p>
+                <p className="mt-2 text-sm text-muted-foreground">Очный формат + онлайн-доклады</p>
+              </div>
+              <div className="space-y-3">
+                {["Открыть секции", "Назначить экспертов", "Сформировать протокол"].map(item => (
+                  <div
+                    key={item}
+                    className="flex items-center justify-between rounded-lg border border-border/60 bg-background/80 px-4 py-3 text-sm"
+                  >
+                    <span>{item}</span>
+                    <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">готово</span>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/conferences">Перейти к настройкам</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       <section className="mt-16 space-y-6" id="events">
@@ -570,84 +669,6 @@ export function HomePage() {
         </div>
       </section>
 
-      {isGuest && isRegisterModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-xl border-border/70 bg-card/90">
-            <CardHeader className="flex flex-row items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-xl">Регистрация участника</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Роль будет установлена как «участник». После регистрации войдите в систему.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setIsRegisterModalOpen(false)}>
-                Закрыть
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Фамилия</Label>
-                  <Input
-                    value={registerForm.lastName}
-                    onChange={event => setRegisterForm(current => ({ ...current, lastName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Имя</Label>
-                  <Input
-                    value={registerForm.firstName}
-                    onChange={event => setRegisterForm(current => ({ ...current, firstName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Отчество</Label>
-                  <Input
-                    value={registerForm.middleName}
-                    onChange={event => setRegisterForm(current => ({ ...current, middleName: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={registerForm.email}
-                    onChange={event => setRegisterForm(current => ({ ...current, email: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Пароль</Label>
-                  <Input
-                    type="password"
-                    value={registerForm.password}
-                    onChange={event => setRegisterForm(current => ({ ...current, password: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Телефон</Label>
-                  <Input
-                    value={registerForm.phone}
-                    onChange={event => setRegisterForm(current => ({ ...current, phone: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Город</Label>
-                  <Input
-                    value={registerForm.city}
-                    onChange={event => setRegisterForm(current => ({ ...current, city: event.target.value }))}
-                  />
-                </div>
-              </div>
-              {registerMessage ? <p>{registerMessage}</p> : null}
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={submitRegistration}>Создать аккаунт</Button>
-                <Button variant="outline" asChild>
-                  <Link href="/login">Уже есть аккаунт</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
     </>
   );
 }
