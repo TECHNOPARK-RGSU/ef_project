@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
 import { Link } from "wouter";
@@ -15,8 +16,48 @@ const REGISTRATION_ROLES = [
   { value: "expert", label: "Эксперт" },
 ] as const;
 
+const PHONE_PLACEHOLDER = "+7 (999) 999-99-99";
+
+function formatPhoneDisplay(digits: string): string {
+  const d = digits.replace(/\D/g, "").slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.startsWith("8")) return formatPhoneDisplay("7" + d.slice(1));
+  const ten = d.startsWith("7") ? d.slice(1, 11) : d.slice(0, 10);
+  if (ten.length <= 3) return `+7 (${ten}`;
+  if (ten.length <= 6) return `+7 (${ten.slice(0, 3)}) ${ten.slice(3)}`;
+  return `+7 (${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6, 8)}-${ten.slice(8, 10)}`;
+}
+
+function phoneToDigits(display: string): string {
+  const d = display.replace(/\D/g, "");
+  if (d.startsWith("7")) return d.slice(0, 11);
+  return d.slice(0, 10);
+}
+
+function validateEmail(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(trimmed) && trimmed.length <= 254;
+}
+
+function validatePhoneDigits(digits: string): boolean {
+  if (digits.length === 0) return true;
+  return digits.length === 10 && /^[0-9]{10}$/.test(digits);
+}
+
+function phoneDigitsToApi(digits: string): string {
+  if (digits.length === 0) return "";
+  return "+7" + (digits.length === 10 ? digits : digits.padEnd(10, "0").slice(0, 10));
+}
+
+type FormErrors = Partial<Record<string, string>>;
+
 export function RegisterPage() {
   const [message, setMessage] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [form, setForm] = useState({
     lastName: "",
     firstName: "",
@@ -29,28 +70,33 @@ export function RegisterPage() {
     city: "",
   });
 
+  const setPhone = (value: string) => {
+    const digits = phoneToDigits(value);
+    setForm(current => ({ ...current, phone: formatPhoneDisplay(digits) }));
+    if (errors.phone) setErrors(e => ({ ...e, phone: undefined }));
+  };
+
+  const runValidation = (): boolean => {
+    const e: FormErrors = {};
+    if (!form.lastName.trim()) e.lastName = "Укажите фамилию.";
+    if (!form.firstName.trim()) e.firstName = "Укажите имя.";
+    if (!form.email.trim()) e.email = "Укажите email.";
+    else if (!validateEmail(form.email)) e.email = "Некорректный формат email.";
+    if (!form.password) e.password = "Укажите пароль.";
+    else if (form.password.length < 6) e.password = "Минимум 6 символов.";
+    if (form.password !== form.confirmPassword) e.confirmPassword = "Пароли не совпадают.";
+    const phoneDigits = phoneToDigits(form.phone);
+    if (phoneDigits.length > 0 && !validatePhoneDigits(phoneDigits)) e.phone = "Введите номер в формате +7 (999) 999-99-99.";
+    setErrors(e);
+    setMessage(Object.keys(e).length > 0 ? "Исправьте ошибки в форме." : null);
+    return Object.keys(e).length === 0;
+  };
+
   const submitRegistration = async () => {
     setMessage(null);
-    if (!form.lastName.trim() || !form.firstName.trim() || !form.email.trim()) {
-      setMessage("Заполните фамилию, имя и email.");
-      return;
-    }
-    if (!form.password.trim()) {
-      setMessage("Укажите пароль.");
-      return;
-    }
-    if (form.password.length < 6) {
-      setMessage("Пароль слишком короткий. Минимум 6 символов.");
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      setMessage("Пароли не совпадают.");
-      return;
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) {
-      setMessage("Укажите корректный email.");
-      return;
-    }
+    setErrors({});
+    if (!runValidation()) return;
+
     const response = await fetch(`${API_BASE_URL}/api/users/users/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,10 +104,10 @@ export function RegisterPage() {
         last_name: form.lastName.trim(),
         first_name: form.firstName.trim(),
         middle_name: form.middleName.trim() || "",
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         role_code: form.roleCode,
-        phone: form.phone.trim(),
+        phone: phoneDigitsToApi(phoneToDigits(form.phone)),
         city: form.city.trim(),
       }),
     });
@@ -69,11 +115,10 @@ export function RegisterPage() {
       let details = "Не удалось зарегистрироваться.";
       try {
         const data = (await response.json()) as Record<string, string[] | string>;
-        const errors = Object.values(data)
-          .flatMap(value => (Array.isArray(value) ? value : [value]))
-          .filter(Boolean)
-          .join(" ");
-        if (errors) details = errors;
+        const list = Object.entries(data).flatMap(([k, v]) =>
+          (Array.isArray(v) ? v : [v]).map(s => (s ? `${k}: ${s}` : "")).filter(Boolean),
+        );
+        if (list.length) details = list.join(" ");
       } catch {
         // ignore
       }
@@ -92,6 +137,7 @@ export function RegisterPage() {
       phone: "",
       city: "",
     });
+    setErrors({});
   };
 
   return (
@@ -107,42 +153,64 @@ export function RegisterPage() {
             <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">projectaris</p>
           </div>
           <CardTitle className="text-2xl">Регистрация</CardTitle>
+          <p className="text-sm text-muted-foreground">Поля со звёздочкой обязательны</p>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Фамилия</Label>
+            <div className="space-y-1.5">
+              <Label>Фамилия <span className="text-destructive">*</span></Label>
               <Input
                 value={form.lastName}
-                onChange={event => setForm(current => ({ ...current, lastName: event.target.value }))}
+                onChange={e => {
+                  setForm(c => ({ ...c, lastName: e.target.value }));
+                  if (errors.lastName) setErrors(err => ({ ...err, lastName: undefined }));
+                }}
+                placeholder="Иванов"
+                className={errors.lastName ? "border-destructive" : ""}
               />
+              {errors.lastName ? <p className="text-xs text-destructive">{errors.lastName}</p> : null}
             </div>
-            <div className="space-y-2">
-              <Label>Имя</Label>
+            <div className="space-y-1.5">
+              <Label>Имя <span className="text-destructive">*</span></Label>
               <Input
                 value={form.firstName}
-                onChange={event => setForm(current => ({ ...current, firstName: event.target.value }))}
+                onChange={e => {
+                  setForm(c => ({ ...c, firstName: e.target.value }));
+                  if (errors.firstName) setErrors(err => ({ ...err, firstName: undefined }));
+                }}
+                placeholder="Иван"
+                className={errors.firstName ? "border-destructive" : ""}
               />
+              {errors.firstName ? <p className="text-xs text-destructive">{errors.firstName}</p> : null}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 md:col-span-2">
               <Label>Отчество</Label>
               <Input
                 value={form.middleName}
-                onChange={event => setForm(current => ({ ...current, middleName: event.target.value }))}
+                onChange={e => setForm(c => ({ ...c, middleName: e.target.value }))}
+                placeholder="Иванович"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>Email <span className="text-destructive">*</span></Label>
               <Input
+                type="email"
+                autoComplete="email"
                 value={form.email}
-                onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
+                onChange={e => {
+                  setForm(c => ({ ...c, email: e.target.value }));
+                  if (errors.email) setErrors(err => ({ ...err, email: undefined }));
+                }}
+                placeholder="example@mail.ru"
+                className={errors.email ? "border-destructive" : ""}
               />
+              {errors.email ? <p className="text-xs text-destructive">{errors.email}</p> : null}
             </div>
-            <div className="space-y-2">
-              <Label>Роль</Label>
+            <div className="space-y-1.5">
+              <Label>Роль <span className="text-destructive">*</span></Label>
               <Select
                 value={form.roleCode}
-                onValueChange={value => setForm(current => ({ ...current, roleCode: value }))}
+                onValueChange={value => setForm(c => ({ ...c, roleCode: value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите роль" />
@@ -156,39 +224,88 @@ export function RegisterPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Пароль</Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
-              />
+            <div className="space-y-1.5" />
+            <div className="space-y-1.5">
+              <Label>Пароль <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={e => {
+                    setForm(c => ({ ...c, password: e.target.value }));
+                    if (errors.password) setErrors(err => ({ ...err, password: undefined }));
+                  }}
+                  placeholder="Минимум 6 символов"
+                  className={`pr-9 ${errors.password ? "border-destructive" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(p => !p)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {errors.password ? <p className="text-xs text-destructive">{errors.password}</p> : null}
             </div>
-            <div className="space-y-2">
-              <Label>Повтор пароля</Label>
-              <Input
-                type="password"
-                value={form.confirmPassword}
-                onChange={event => setForm(current => ({ ...current, confirmPassword: event.target.value }))}
-              />
+            <div className="space-y-1.5">
+              <Label>Повтор пароля <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={form.confirmPassword}
+                  onChange={e => {
+                    setForm(c => ({ ...c, confirmPassword: e.target.value }));
+                    if (errors.confirmPassword) setErrors(err => ({ ...err, confirmPassword: undefined }));
+                  }}
+                  placeholder="Повторите пароль"
+                  className={`pr-9 ${errors.confirmPassword ? "border-destructive" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(p => !p)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
+                >
+                  {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {errors.confirmPassword ? <p className="text-xs text-destructive">{errors.confirmPassword}</p> : null}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 md:col-span-2">
               <Label>Телефон</Label>
               <Input
+                type="tel"
+                autoComplete="tel"
                 value={form.phone}
-                onChange={event => setForm(current => ({ ...current, phone: event.target.value }))}
+                onChange={e => setPhone(e.target.value)}
+                onBlur={() => {
+                  const digits = phoneToDigits(form.phone);
+                  if (digits.length > 0 && !validatePhoneDigits(digits)) setErrors(err => ({ ...err, phone: "Формат: +7 (999) 999-99-99" }));
+                }}
+                placeholder={PHONE_PLACEHOLDER}
+                className={errors.phone ? "border-destructive" : ""}
               />
+              {errors.phone ? <p className="text-xs text-destructive">{errors.phone}</p> : null}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 md:col-span-2">
               <Label>Город</Label>
               <Input
                 value={form.city}
-                onChange={event => setForm(current => ({ ...current, city: event.target.value }))}
+                onChange={e => setForm(c => ({ ...c, city: e.target.value }))}
+                placeholder="Москва"
               />
             </div>
           </div>
-          <Button onClick={submitRegistration}>Создать аккаунт</Button>
-          {message ? <p>{message}</p> : null}
+          {message ? (
+            <p className={`text-sm ${message.includes("создана") ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+              {message}
+            </p>
+          ) : null}
+          <Button onClick={submitRegistration} className="w-full sm:w-auto">Создать аккаунт</Button>
           <p className="text-xs text-muted-foreground">
             Уже есть аккаунт?{" "}
             <Link href="/login" className="text-primary hover:underline">
