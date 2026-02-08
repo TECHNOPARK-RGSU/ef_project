@@ -110,10 +110,14 @@ export function AssignmentsPage() {
       if (conferenceFilter !== "all" && String(item.conference.id) !== conferenceFilter) return false;
       if (stageFilter !== "all" && item.stage !== stageFilter) return false;
       if (!needle) return true;
+      if (isExpertRole) {
+        const items = item.items ?? [];
+        return items.some(it => (it.project?.title ?? "").toLowerCase().includes(needle));
+      }
       const expertName = `${item.expert.last_name ?? ""} ${item.expert.first_name ?? ""}`.toLowerCase();
       return expertName.includes(needle) || item.conference.title.toLowerCase().includes(needle);
     });
-  }, [assignments, conferenceFilter, query, stageFilter, isOrganizerRole, authUser?.id]);
+  }, [assignments, conferenceFilter, query, stageFilter, isOrganizerRole, isExpertRole, authUser?.id]);
   const perPage = 6;
   const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / perPage));
   const paginatedAssignments = useMemo(() => {
@@ -381,7 +385,7 @@ export function AssignmentsPage() {
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder="Эксперт или конференция"
+              placeholder={isExpertRole ? "Название проекта" : "Эксперт или конференция"}
             />
           </div>
           <div className="space-y-2">

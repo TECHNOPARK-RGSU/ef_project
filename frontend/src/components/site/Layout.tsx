@@ -19,7 +19,6 @@ function getNavItems(roleCode: string): NavItem[] {
   if (normalizedRole === "expert") {
     return [
       { label: "Главная", href: "/" },
-      { label: "Конференции", href: "/conferences" },
       { label: "Мои назначения", href: "/assignments" },
     ];
   }

@@ -253,9 +253,11 @@ export function CommentsPage() {
                     <Button size="sm" variant="secondary" onClick={() => startEdit(item)}>
                       Редактировать
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => deleteComment(item.id)}>
-                      Удалить
-                    </Button>
+                    {isOrganizerRole ? (
+                      <Button size="sm" variant="outline" onClick={() => deleteComment(item.id)}>
+                        Удалить
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
