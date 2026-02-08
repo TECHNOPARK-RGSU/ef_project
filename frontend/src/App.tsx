@@ -3,6 +3,7 @@ import { ApplyPage } from "@/pages/ApplyPage";
 import { AssignmentsPage } from "@/pages/AssignmentsPage";
 import { CatalogsPage } from "@/pages/CatalogsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
+import { ConferenceResultsPage } from "@/pages/ConferenceResultsPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
 import { HomePage } from "@/pages/HomePage";
 import { ContactsPage, DocumentsPage, PolicyPage } from "@/pages/InfoPages";
@@ -95,14 +96,14 @@ export function App() {
   const canAccessApply = isOrganizer || isTutor || isStudent;
   const canAccessScores = isOrganizer || isExpert;
   const canAccessAdminCatalogs = isOrganizer;
+  const canAccessGlobalUsers = false;
 
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;
     if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
-    if (path === "/sections" || path === "/roles" || path === "/users" || path.startsWith("/users/") || path === "/catalogs") {
-      return canAccessAdminCatalogs;
-    }
+    if (path === "/users" || path.startsWith("/users/")) return canAccessGlobalUsers;
+    if (path === "/sections" || path === "/roles" || path === "/catalogs") return canAccessAdminCatalogs;
     return false;
   };
 
@@ -147,10 +148,11 @@ export function App() {
           {canAccessConferences && canAccessApply ? <Route path="/conferences/:id/projects" component={ApplyPage} /> : null}
           {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
           {canAccessConferences && canAccessScores ? <Route path="/conferences/:id/scores" component={ScoresPage} /> : null}
+          {canAccessConferences ? <Route path="/conferences/:id/results" component={ConferenceResultsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}
-          {canAccessAdminCatalogs ? <Route path="/users/:id" component={UserDetailPage} /> : null}
+          {canAccessGlobalUsers ? <Route path="/users" component={UsersPage} /> : null}
+          {canAccessGlobalUsers ? <Route path="/users/:id" component={UserDetailPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/catalogs" component={CatalogsPage} /> : null}
           <Route path="/policy" component={PolicyPage} />
           <Route path="/contacts" component={ContactsPage} />

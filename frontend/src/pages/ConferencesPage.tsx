@@ -53,6 +53,26 @@ export function ConferencesPage() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (state !== "ready" || !conferences.length) return;
+    let editId: string | null = null;
+    try {
+      editId = sessionStorage.getItem("conferenceEditId");
+    } catch {
+      /* ignore */
+    }
+    if (!editId) return;
+    const num = Number(editId);
+    if (!Number.isFinite(num)) return;
+    try {
+      sessionStorage.removeItem("conferenceEditId");
+    } catch {
+      /* ignore */
+    }
+    const conf = conferences.find(c => c.id === num);
+    if (conf) startEdit(conf);
+  }, [state, conferences]);
+
   const visibleConferences = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return conferences.filter(item => {
@@ -291,14 +311,9 @@ export function ConferencesPage() {
                     <Link href={`/conferences/${conf.id}`}>Карточка</Link>
                   </Button>
                   {isOrganizer ? (
-                    <>
-                      <Button size="sm" variant="secondary" onClick={() => startEdit(conf)}>
-                        Редактировать
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => deleteConference(conf.id)}>
-                        Удалить
-                      </Button>
-                    </>
+                    <Button size="sm" variant="outline" onClick={() => deleteConference(conf.id)}>
+                      Удалить
+                    </Button>
                   ) : null}
                 </div>
               </CardContent>

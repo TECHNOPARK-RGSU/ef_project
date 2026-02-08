@@ -5,15 +5,17 @@ import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import { isStudentRole as checkStudentRole } from "@/lib/roles";
 import type {
+  AgeCategory,
   Conference,
   ConferenceExpert,
   EvaluationCriterion,
+  Project,
   ProjectResult,
   Section,
   User,
 } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,14 +29,16 @@ export function ConferenceDetailPage() {
   const isTutorRole = roleCode === "tutor";
   const isStudentRole = checkStudentRole(roleCode);
   const [, params] = useRoute("/conferences/:id");
+  const [, setLocation] = useLocation();
   const id = params?.id ? Number(params.id) : null;
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conference, setConference] = useState<Conference | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>([]);
   const [results, setResults] = useState<ProjectResult[]>([]);
+  const [projectsForConference, setProjectsForConference] = useState<Project[]>([]);
+  const [categories, setCategories] = useState<AgeCategory[]>([]);
   const [criteriaMessage, setCriteriaMessage] = useState<string | null>(null);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [conferenceExperts, setConferenceExperts] = useState<ConferenceExpert[]>([]);
   const [expertUsers, setExpertUsers] = useState<User[]>([]);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
@@ -52,10 +56,12 @@ export function ConferenceDetailPage() {
   const [editingCriterionId, setEditingCriterionId] = useState<number | null>(null);
   const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
   const [criteriaPage, setCriteriaPage] = useState(1);
-  const [resultsPreviewPage, setResultsPreviewPage] = useState(1);
   const [sectionsPage, setSectionsPage] = useState(1);
   const [expertsPage, setExpertsPage] = useState(1);
-  const [resultsPage, setResultsPage] = useState(1);
+  const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
+  const [sectionForm, setSectionForm] = useState({ name: "", categoryId: "" });
+  const [sectionMessage, setSectionMessage] = useState<string | null>(null);
+  const [leadersPage, setLeadersPage] = useState(1);
 
   useEffect(() => {
     if (!id) return;
@@ -91,16 +97,20 @@ export function ConferenceDetailPage() {
       const tasks = await Promise.allSettled([
         fetchList<EvaluationCriterion>(`/api/conf/criteria/?conference=${id}`, controller.signal),
         fetchList<ProjectResult>(`/api/conf/results/?conference=${id}`, controller.signal),
+        fetchList<Project>(`/api/conf/projects/?section__conference=${id}`, controller.signal),
         isOrganizerRole
           ? fetchList<ConferenceExpert>(`/api/conf/conference-experts/?conference=${id}`, controller.signal)
           : Promise.resolve([] as ConferenceExpert[]),
         isOrganizerRole ? fetchList<User>(`/api/users/users/`, controller.signal) : Promise.resolve([] as User[]),
+        isOrganizerRole ? fetchList<AgeCategory>("/api/conf/age-categories/", controller.signal) : Promise.resolve([] as AgeCategory[]),
       ]);
       if (controller.signal.aborted) return;
       if (tasks[0].status === "fulfilled") setCriteria(tasks[0].value);
       if (tasks[1].status === "fulfilled") setResults(tasks[1].value);
-      if (tasks[2].status === "fulfilled") setConferenceExperts(tasks[2].value);
-      if (tasks[3].status === "fulfilled") setExpertUsers(tasks[3].value);
+      if (tasks[2].status === "fulfilled") setProjectsForConference(tasks[2].value);
+      if (tasks[3].status === "fulfilled") setConferenceExperts(tasks[3].value);
+      if (tasks[4].status === "fulfilled") setExpertUsers(tasks[4].value);
+      if (tasks[5].status === "fulfilled") setCategories(tasks[5].value);
     };
     loadMeta();
     return () => controller.abort();
@@ -122,20 +132,14 @@ export function ConferenceDetailPage() {
     [conferenceSections],
   );
   const CRITERIA_PER_PAGE = 6;
-  const RESULTS_PREVIEW_PER_PAGE = 4;
   const SECTIONS_PER_PAGE = 6;
   const EXPERTS_PER_PAGE = 5;
-  const RESULTS_PER_PAGE = 8;
+  const LEADERS_PER_PAGE = 8;
   const criteriaTotalPages = Math.max(1, Math.ceil(criteria.length / CRITERIA_PER_PAGE));
   const paginatedCriteria = useMemo(() => {
     const start = (criteriaPage - 1) * CRITERIA_PER_PAGE;
     return criteria.slice(start, start + CRITERIA_PER_PAGE);
   }, [criteria, criteriaPage]);
-  const resultsPreviewTotalPages = Math.max(1, Math.ceil(results.length / RESULTS_PREVIEW_PER_PAGE));
-  const paginatedResultsPreview = useMemo(() => {
-    const start = (resultsPreviewPage - 1) * RESULTS_PREVIEW_PER_PAGE;
-    return results.slice(start, start + RESULTS_PREVIEW_PER_PAGE);
-  }, [results, resultsPreviewPage]);
   const sectionsTotalPages = Math.max(1, Math.ceil(sectionsForDisplay.length / SECTIONS_PER_PAGE));
   const paginatedSectionsForDisplay = useMemo(() => {
     const start = (sectionsPage - 1) * SECTIONS_PER_PAGE;
@@ -146,11 +150,23 @@ export function ConferenceDetailPage() {
     const start = (expertsPage - 1) * EXPERTS_PER_PAGE;
     return conferenceExperts.slice(start, start + EXPERTS_PER_PAGE);
   }, [conferenceExperts, expertsPage]);
-  const resultsTotalPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
-  const paginatedResultsBottom = useMemo(() => {
-    const start = (resultsPage - 1) * RESULTS_PER_PAGE;
-    return results.slice(start, start + RESULTS_PER_PAGE);
-  }, [results, resultsPage]);
+  const projectLeaders = useMemo(() => {
+    const seen = new Set<number>();
+    const list: User[] = [];
+    for (const p of projectsForConference) {
+      const leader = p.leader;
+      if (leader?.id && !seen.has(leader.id)) {
+        seen.add(leader.id);
+        list.push(leader);
+      }
+    }
+    return list;
+  }, [projectsForConference]);
+  const leadersTotalPages = Math.max(1, Math.ceil(projectLeaders.length / LEADERS_PER_PAGE));
+  const paginatedLeaders = useMemo(() => {
+    const start = (leadersPage - 1) * LEADERS_PER_PAGE;
+    return projectLeaders.slice(start, start + LEADERS_PER_PAGE);
+  }, [projectLeaders, leadersPage]);
   const availableExperts = useMemo(() => {
     return expertUsers.filter(user => (user.role?.code ?? "").toLowerCase() === "expert");
   }, [expertUsers]);
@@ -234,97 +250,32 @@ export function ConferenceDetailPage() {
     setConferenceExperts(current => current.filter(item => item.id !== itemId));
   };
 
-  const runCalculation = async () => {
-    setResultMessage(null);
+  const submitSection = async () => {
+    setSectionMessage(null);
+    if (!id || !sectionForm.name.trim()) return;
     const token = getAuthToken();
     if (!token) {
-      setResultMessage("Нужен токен для расчёта результатов.");
+      setSectionMessage("Нужен токен для добавления секции.");
       return;
     }
-    const response = await fetch(`${API_BASE_URL}/api/conf/conferences/${id}/calculate_results/`, {
+    const body: { conference_id: number; name: string; category_id?: number } = {
+      conference_id: id,
+      name: sectionForm.name.trim(),
+    };
+    if (sectionForm.categoryId) body.category_id = Number(sectionForm.categoryId);
+    const response = await fetch(`${API_BASE_URL}/api/conf/sections/`, {
       method: "POST",
-      headers: { Authorization: `Token ${token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
-      setResultMessage("Не удалось рассчитать результаты.");
+      setSectionMessage("Не удалось добавить секцию.");
       return;
     }
-    const updated = await fetchList<ProjectResult>(`/api/conf/results/?conference=${id}`);
-    setResults(updated);
-    setResultMessage("Результаты пересчитаны.");
-  };
-
-  const publishResults = async () => {
-    setResultMessage(null);
-    const token = getAuthToken();
-    if (!token) {
-      setResultMessage("Нужен токен для публикации результатов.");
-      return;
-    }
-    const response = await fetch(`${API_BASE_URL}/api/conf/conferences/${id}/publish_results/`, {
-      method: "POST",
-      headers: { Authorization: `Token ${token}` },
-    });
-    if (!response.ok) {
-      setResultMessage("Не удалось опубликовать результаты.");
-      return;
-    }
-    if (conference) {
-      setConference({ ...conference, results_published: true });
-    }
-    setResultMessage("Результаты опубликованы.");
-  };
-
-  const downloadResults = async (format: "csv" | "xlsx") => {
-    setResultMessage(null);
-    const token = getAuthToken();
-    if (!token) {
-      setResultMessage("Нужен токен для экспорта результатов.");
-      return;
-    }
-    const endpoint =
-      format === "csv" ? "export_results" : "export_results_excel";
-    const response = await fetch(
-      `${API_BASE_URL}/api/conf/conferences/${id}/${endpoint}/`,
-      { headers: { Authorization: `Token ${token}` } }
-    );
-    if (!response.ok) {
-      setResultMessage("Не удалось скачать файл.");
-      return;
-    }
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `conference_${id}_results.${format}`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const openPrintProtocol = async () => {
-    setResultMessage(null);
-    const token = getAuthToken();
-    if (!token) {
-      setResultMessage("Нужен токен для печати протокола.");
-      return;
-    }
-    const response = await fetch(`${API_BASE_URL}/api/conf/conferences/${id}/print_protocol/`, {
-      headers: { Authorization: `Token ${token}` },
-    });
-    if (!response.ok) {
-      setResultMessage("Не удалось открыть протокол.");
-      return;
-    }
-    const html = await response.text();
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      setResultMessage("Браузер заблокировал окно печати.");
-      return;
-    }
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
+    const updated = await fetchList<Section>("/api/conf/sections/");
+    setSections(updated);
+    setSectionForm({ name: "", categoryId: "" });
+    setIsSectionModalOpen(false);
   };
 
   if (!id) {
@@ -367,6 +318,11 @@ export function ConferenceDetailPage() {
                   <Link href={`/conferences/${id}/projects`}>Заявки</Link>
                 </Button>
               ) : null}
+              {isOrganizerRole ? (
+                <Button variant="outline" asChild>
+                  <Link href={`/conferences/${id}/results`}>Результаты</Link>
+                </Button>
+              ) : null}
               {(isOrganizerRole || isExpertRole) ? (
                 <Button variant="outline" asChild>
                   <Link href={`/conferences/${id}/assignments`}>Назначения</Link>
@@ -375,6 +331,19 @@ export function ConferenceDetailPage() {
               {(isOrganizerRole || isExpertRole) ? (
                 <Button variant="outline" asChild>
                   <Link href={`/conferences/${id}/scores`}>Оценки</Link>
+                </Button>
+              ) : null}
+              {isOrganizerRole ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (id) {
+                      try { sessionStorage.setItem("conferenceEditId", String(id)); } catch (_) {}
+                      setLocation("/conferences");
+                    }
+                  }}
+                >
+                  Редактировать конференцию
                 </Button>
               ) : null}
             </>
@@ -410,28 +379,14 @@ export function ConferenceDetailPage() {
 
         <Card className="border-border/70 bg-card/85">
           <CardHeader className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Результаты</p>
-            <CardTitle className="text-lg">Публикация и доступ</CardTitle>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Заявки</p>
+            <CardTitle className="text-lg">Проекты конференции</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>Статус: {conference?.results_published ? "опубликованы" : "черновик"}</p>
-            <p>Опубликованные результаты видят участники, наставники и эксперты.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={runCalculation}>
-                Пересчитать
-              </Button>
-              <Button onClick={publishResults}>Опубликовать</Button>
-              <Button variant="outline" onClick={() => downloadResults("csv")}>
-                Экспорт CSV
-              </Button>
-              <Button variant="outline" onClick={() => downloadResults("xlsx")}>
-                Экспорт XLSX
-              </Button>
-              <Button variant="outline" onClick={openPrintProtocol}>
-                Протокол
-              </Button>
-            </div>
-            {resultMessage ? <p>{resultMessage}</p> : null}
+            <p>Заявок: {projectsForConference.length}. С результатами: {results.length}.</p>
+            <Button variant="outline" asChild>
+              <Link href={`/conferences/${id}/projects`}>Перейти к заявкам</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -520,34 +475,6 @@ export function ConferenceDetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader>
-            <CardTitle className="text-lg">Проекты и результаты</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            {paginatedResultsPreview.length ? (
-              paginatedResultsPreview.map(item => (
-                <p key={item.id}>
-                  {item.project.title}: {item.total_score} б., место {item.rank}
-                </p>
-              ))
-            ) : (
-              <p>Результаты будут доступны после расчёта.</p>
-            )}
-            {results.length > RESULTS_PREVIEW_PER_PAGE ? (
-              <div className="flex flex-wrap items-center justify-between gap-1 pt-1 text-xs">
-                <span>{resultsPreviewPage} / {resultsPreviewTotalPages}</span>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={resultsPreviewPage <= 1} onClick={() => setResultsPreviewPage(p => Math.max(1, p - 1))}>←</Button>
-                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={resultsPreviewPage >= resultsPreviewTotalPages} onClick={() => setResultsPreviewPage(p => Math.min(resultsPreviewTotalPages, p + 1))}>→</Button>
-                </div>
-              </div>
-            ) : null}
-            <Button variant="outline" size="sm" asChild>
-              <Link href={id ? `/conferences/${id}/scores` : "/scores"}>К оценкам</Link>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {isCriteriaModalOpen ? (
@@ -763,7 +690,21 @@ export function ConferenceDetailPage() {
       ) : null}
 
       <div className="space-y-3">
-        <h2 className="text-xl font-semibold">Секции конференции</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">Секции конференции</h2>
+          {isOrganizerRole ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setSectionForm({ name: "", categoryId: "" });
+                setSectionMessage(null);
+                setIsSectionModalOpen(true);
+              }}
+            >
+              Добавить секцию
+            </Button>
+          ) : null}
+        </div>
         <div className="grid gap-3 md:grid-cols-2">
           {paginatedSectionsForDisplay.length ? (
             paginatedSectionsForDisplay.map(section => (
@@ -799,39 +740,84 @@ export function ConferenceDetailPage() {
 
       <div className="space-y-3">
         <h2 className="text-xl font-semibold">Результаты</h2>
-        {resultMessage ? <p className="text-sm text-muted-foreground">{resultMessage}</p> : null}
-        <div className="grid gap-3 md:grid-cols-2">
-          {paginatedResultsBottom.length ? (
-            paginatedResultsBottom.map(result => (
-              <Card key={result.id} className="border-border/70 bg-card/80">
-                <CardHeader className="py-3">
-                  <CardTitle className="text-base">{result.project.title}</CardTitle>
-                  <p className="text-xs text-muted-foreground">{result.section.name}</p>
-                </CardHeader>
-                <CardContent className="py-0 text-sm text-muted-foreground">
-                  <p>Итог: {result.total_score} · Место: {result.rank} · {result.is_winner ? "Победитель" : result.is_prize ? "Призёр" : "Участник"}</p>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card className="border-border/70 bg-card/80 md:col-span-2">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                Результаты ещё не рассчитаны.
-              </CardContent>
-            </Card>
-          )}
-        </div>
-        {results.length > RESULTS_PER_PAGE ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>Показано {paginatedResultsBottom.length} из {results.length}</span>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" className="h-7" disabled={resultsPage <= 1} onClick={() => setResultsPage(p => Math.max(1, p - 1))}>Назад</Button>
-              <span>{resultsPage} / {resultsTotalPages}</span>
-              <Button size="sm" variant="outline" className="h-7" disabled={resultsPage >= resultsTotalPages} onClick={() => setResultsPage(p => Math.min(resultsTotalPages, p + 1))}>Вперёд</Button>
-            </div>
-          </div>
-        ) : null}
+        <Card className="border-border/70 bg-card/80">
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            <p>Пересчёт, публикация, экспорт и протокол — на отдельной странице результатов.</p>
+            <Button variant="outline" size="sm" className="mt-3" asChild>
+              <Link href={id ? `/conferences/${id}/results` : "/conferences"}>Перейти к результатам</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      {isOrganizerRole && projectLeaders.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold">Участники конференции</h2>
+          <p className="text-sm text-muted-foreground">Руководители проектов (уникальные по заявкам)</p>
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="p-4 space-y-2 text-sm">
+              {paginatedLeaders.map(leader => (
+                <div key={leader.id} className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                  <span className="font-medium text-foreground">{leader.last_name} {leader.first_name}</span>
+                  {leader.email ? <span className="text-muted-foreground"> · {leader.email}</span> : null}
+                </div>
+              ))}
+              {projectLeaders.length > LEADERS_PER_PAGE ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+                  <span>Показано {paginatedLeaders.length} из {projectLeaders.length}</span>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="h-7" disabled={leadersPage <= 1} onClick={() => setLeadersPage(p => Math.max(1, p - 1))}>←</Button>
+                    <span>{leadersPage} / {leadersTotalPages}</span>
+                    <Button size="sm" variant="outline" className="h-7" disabled={leadersPage >= leadersTotalPages} onClick={() => setLeadersPage(p => Math.min(leadersTotalPages, p + 1))}>→</Button>
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {isSectionModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card/95">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <CardTitle className="text-lg">Добавить секцию</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setIsSectionModalOpen(false)}>Закрыть</Button>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <Label>Название секции</Label>
+                <Input
+                  value={sectionForm.name}
+                  onChange={e => setSectionForm(current => ({ ...current, name: e.target.value }))}
+                  placeholder="Название"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Возрастная категория</Label>
+                <Select
+                  value={sectionForm.categoryId || undefined}
+                  onValueChange={v => setSectionForm(current => ({ ...current, categoryId: v }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите категорию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {sectionMessage ? <p className="text-destructive">{sectionMessage}</p> : null}
+              <div className="flex gap-2">
+                <Button onClick={submitSection}>Добавить</Button>
+                <Button variant="outline" onClick={() => setIsSectionModalOpen(false)}>Отмена</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </section>
   );
 }

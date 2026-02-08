@@ -503,6 +503,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = [
         "section",
+        "section__conference",
         "status",
         "stage",
         "presentation_type",
