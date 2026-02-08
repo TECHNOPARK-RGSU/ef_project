@@ -19,6 +19,12 @@ export function ScoresPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [conferenceFilter, setConferenceFilter] = useState("all");
+  const [sectionFilter, setSectionFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
+  const [evaluatorFilter, setEvaluatorFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     projectId: "",
     criterionId: "",
@@ -45,6 +51,44 @@ export function ScoresPage() {
     });
     return Array.from(unique.values());
   }, [criteria, selectedProject]);
+  const conferenceOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    projects.forEach(project => {
+      const conf = project.section?.conference;
+      if (conf?.id && conf.title) map.set(conf.id, conf.title);
+    });
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+  }, [projects]);
+  const sectionOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    projects.forEach(project => {
+      const section = project.section;
+      if (section?.id && section.name) map.set(section.id, section.name);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [projects]);
+  const filteredScores = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return scores.filter(score => {
+      if (conferenceFilter !== "all" && String(score.project.section?.conference?.id) !== conferenceFilter)
+        return false;
+      if (sectionFilter !== "all" && String(score.project.section?.id) !== sectionFilter) return false;
+      if (stageFilter !== "all" && score.criterion.stage !== stageFilter) return false;
+      if (evaluatorFilter !== "all" && String(score.evaluator?.id ?? "") !== evaluatorFilter) return false;
+      if (!needle) return true;
+      return score.project.title.toLowerCase().includes(needle);
+    });
+  }, [conferenceFilter, evaluatorFilter, query, scores, sectionFilter, stageFilter]);
+  const perPage = 8;
+  const totalPages = Math.max(1, Math.ceil(filteredScores.length / perPage));
+  const paginatedScores = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredScores.slice(start, start + perPage);
+  }, [filteredScores, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, conferenceFilter, sectionFilter, stageFilter, evaluatorFilter]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -157,7 +201,7 @@ export function ScoresPage() {
 
       {isScoreModalOpen ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-3xl border-border/70 bg-card/80">
+      <Card className="w-full max-w-3xl border-border/70 bg-card/95">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">
@@ -257,15 +301,96 @@ export function ScoresPage() {
       </div>
       ) : null}
 
+      <Card className="border-border/70 bg-card/80">
+        <CardHeader>
+          <CardTitle className="text-lg">Поиск и фильтры</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
+          <div className="space-y-2 md:col-span-2">
+            <Label>Поиск</Label>
+            <Input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Название проекта"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Конференция</Label>
+            <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Все конференции" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все конференции</SelectItem>
+                {conferenceOptions.map(conf => (
+                  <SelectItem key={conf.id} value={String(conf.id)}>
+                    {conf.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Секция</Label>
+            <Select value={sectionFilter} onValueChange={setSectionFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Все секции" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все секции</SelectItem>
+                {sectionOptions.map(section => (
+                  <SelectItem key={section.id} value={String(section.id)}>
+                    {section.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Этап</Label>
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Все этапы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все этапы</SelectItem>
+                <SelectItem value="online">Заочный</SelectItem>
+                <SelectItem value="offline">Очный</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isOrganizerRole ? (
+            <div className="space-y-2">
+              <Label>Оценщик</Label>
+              <Select value={evaluatorFilter} onValueChange={setEvaluatorFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Все эксперты" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все эксперты</SelectItem>
+                  {expertUsers.map(user => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.last_name} {user.first_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
-        {scores.length ? (
-          scores.map(score => (
+        {paginatedScores.length ? (
+          paginatedScores.map(score => (
             <Card key={score.id} className="border-border/70 bg-card/80">
               <CardHeader>
                 <CardTitle className="text-lg">{score.project.title}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-1">
                 <p>Критерий: {score.criterion.name}</p>
+                <p>Этап: {score.criterion.stage === "online" ? "заочный" : "очный"}</p>
+                <p>Секция: {score.project.section?.name || "—"}</p>
                 <p>Оценщик: {score.evaluator ? `${score.evaluator.last_name} ${score.evaluator.first_name}` : "—"}</p>
                 <p>Баллы: {score.score}</p>
                 <div className="flex flex-wrap gap-2 pt-2">
@@ -284,6 +409,27 @@ export function ScoresPage() {
             <CardContent className="p-6 text-sm text-muted-foreground">Оценок пока нет.</CardContent>
           </Card>
         )}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <span>
+          Показано {paginatedScores.length} из {filteredScores.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+            Назад
+          </Button>
+          <span>
+            {page} / {totalPages}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          >
+            Вперёд
+          </Button>
+        </div>
       </div>
     </section>
   );

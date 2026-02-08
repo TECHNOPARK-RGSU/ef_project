@@ -7,6 +7,9 @@ from conf.views import (
     SectionViewSet,
     ProjectStatusViewSet,
     ParticipationStageViewSet,
+    ConferenceStatusFlowItemViewSet,
+    ConferenceStageAvailabilityViewSet,
+    ConferenceExpertViewSet,
     PresentationTypeViewSet,
     ProjectViewSet,
     CommentViewSet,
@@ -28,6 +31,21 @@ router.register(
     r"participation-stages",
     ParticipationStageViewSet,
     basename="participation-stage",
+)
+router.register(
+    r"conference-status-flow",
+    ConferenceStatusFlowItemViewSet,
+    basename="conference-status-flow",
+)
+router.register(
+    r"conference-stages",
+    ConferenceStageAvailabilityViewSet,
+    basename="conference-stages",
+)
+router.register(
+    r"conference-experts",
+    ConferenceExpertViewSet,
+    basename="conference-experts",
 )
 router.register(
     r"presentation-types",

@@ -23,6 +23,9 @@ from conf.models import (
     Section,
     ProjectStatus,
     ParticipationStage,
+    ConferenceStatusFlowItem,
+    ConferenceStageAvailability,
+    ConferenceExpert,
     Place,
     PresentationType,
     Project,
@@ -39,6 +42,9 @@ from conf.serializers import (
     SectionSerializer,
     ProjectStatusSerializer,
     ParticipationStageSerializer,
+    ConferenceStatusFlowItemSerializer,
+    ConferenceStageAvailabilitySerializer,
+    ConferenceExpertSerializer,
     PlaceSerializer,
     PresentationTypeSerializer,
     ProjectSerializer,
@@ -124,9 +130,11 @@ class ConferenceViewSet(viewsets.ModelViewSet):
         if per_expert <= 0:
             return Response({"detail": "per_expert must be > 0"}, status=400)
 
-        experts = User.objects.filter(role__code__iexact="expert", is_archived=False)
-        if not experts.exists():
-            return Response({"detail": "No experts found."}, status=400)
+        conference_experts = ConferenceExpert.objects.filter(
+            conference=conference, expert__is_archived=False
+        ).select_related("expert")
+        if not conference_experts.exists():
+            return Response({"detail": "No experts found for conference."}, status=400)
 
         projects = Project.objects.filter(section__conference=conference, is_archived=False).order_by("id")
         assigned_ids = set(
@@ -139,34 +147,57 @@ class ConferenceViewSet(viewsets.ModelViewSet):
 
         created_items = 0
         with transaction.atomic():
-            for expert in experts:
+            expert_slots = []
+            for conf_expert in conference_experts:
                 assignment, _ = ExpertAssignment.objects.get_or_create(
                     conference=conference,
-                    expert=expert,
+                    expert=conf_expert.expert,
                     stage=stage,
                     defaults={"max_projects": per_expert},
                 )
                 if assignment.max_projects != per_expert:
                     assignment.max_projects = per_expert
                     assignment.save(update_fields=["max_projects"])
+                section_ids = list(conf_expert.sections.values_list("id", flat=True))
+                expert_slots.append(
+                    {
+                        "assignment": assignment,
+                        "sections": set(section_ids) if section_ids else None,
+                        "count": 0,
+                    }
+                )
 
-                slice_projects = available_projects[:per_expert]
-                available_projects = available_projects[per_expert:]
-                items = [
-                    ExpertAssignmentItem(assignment=assignment, project=project)
-                    for project in slice_projects
+            items = []
+            for project in available_projects:
+                eligible = [
+                    slot
+                    for slot in expert_slots
+                    if slot["count"] < per_expert
+                    and (slot["sections"] is None or project.section_id in slot["sections"])
                 ]
-                ExpertAssignmentItem.objects.bulk_create(items, ignore_conflicts=True)
-                created_items += len(items)
-                if not available_projects:
-                    break
+                if not eligible:
+                    continue
+                chosen = min(
+                    eligible,
+                    key=lambda slot: (slot["count"], slot["assignment"].id),
+                )
+                items.append(
+                    ExpertAssignmentItem(
+                        assignment=chosen["assignment"],
+                        project=project,
+                    )
+                )
+                chosen["count"] += 1
+
+            ExpertAssignmentItem.objects.bulk_create(items, ignore_conflicts=True)
+            created_items += len(items)
 
         return Response(
             {
                 "status": "ok",
                 "assigned": created_items,
-                "experts": experts.count(),
-                "remaining": len(available_projects),
+                "experts": conference_experts.count(),
+                "remaining": max(len(available_projects) - created_items, 0),
             }
         )
 
@@ -341,6 +372,104 @@ class ParticipationStageViewSet(viewsets.ModelViewSet):
     ordering = ["name"]
 
 
+class ConferenceStatusFlowItemViewSet(viewsets.ModelViewSet):
+    """ViewSet для воронки статусов конференции."""
+
+    queryset = ConferenceStatusFlowItem.objects.all()
+    serializer_class = ConferenceStatusFlowItemSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+    role_requirements = {
+        "create": ["organizer"],
+        "update": ["organizer"],
+        "partial_update": ["organizer"],
+        "destroy": ["organizer"],
+        "list": ["organizer", "expert", "tutor", "student"],
+        "retrieve": ["organizer", "expert", "tutor", "student"],
+    }
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["conference", "status", "is_enabled"]
+    ordering_fields = ["order", "created_at"]
+    ordering = ["order"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        conference_id = self.request.query_params.get("conference")
+        if conference_id:
+            conference = Conference.objects.filter(id=conference_id).first()
+            if conference and not queryset.filter(conference=conference).exists():
+                statuses = ProjectStatus.objects.filter(is_archived=False).order_by("name")
+                ConferenceStatusFlowItem.objects.bulk_create(
+                    [
+                        ConferenceStatusFlowItem(conference=conference, status=status, order=index)
+                        for index, status in enumerate(statuses)
+                    ]
+                )
+            queryset = queryset.filter(conference_id=conference_id)
+        return queryset
+
+
+class ConferenceStageAvailabilityViewSet(viewsets.ModelViewSet):
+    """ViewSet для доступных этапов конференции."""
+
+    queryset = ConferenceStageAvailability.objects.all()
+    serializer_class = ConferenceStageAvailabilitySerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+    role_requirements = {
+        "create": ["organizer"],
+        "update": ["organizer"],
+        "partial_update": ["organizer"],
+        "destroy": ["organizer"],
+        "list": ["organizer", "expert", "tutor", "student"],
+        "retrieve": ["organizer", "expert", "tutor", "student"],
+    }
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["conference", "stage", "is_enabled"]
+    ordering_fields = ["created_at"]
+    ordering = ["created_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        conference_id = self.request.query_params.get("conference")
+        if conference_id:
+            conference = Conference.objects.filter(id=conference_id).first()
+            if conference and not queryset.filter(conference=conference).exists():
+                stages = ParticipationStage.objects.filter(is_archived=False).order_by("name")
+                ConferenceStageAvailability.objects.bulk_create(
+                    [
+                        ConferenceStageAvailability(conference=conference, stage=stage, is_enabled=True)
+                        for stage in stages
+                    ]
+                )
+            queryset = queryset.filter(conference_id=conference_id)
+        return queryset
+
+
+class ConferenceExpertViewSet(viewsets.ModelViewSet):
+    """ViewSet для экспертов конференции."""
+
+    queryset = ConferenceExpert.objects.all()
+    serializer_class = ConferenceExpertSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+    role_requirements = {
+        "create": ["organizer"],
+        "update": ["organizer"],
+        "partial_update": ["organizer"],
+        "destroy": ["organizer"],
+        "list": ["organizer"],
+        "retrieve": ["organizer"],
+    }
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["conference", "expert"]
+    search_fields = ["expert__last_name", "expert__first_name", "expert__email"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        conference_id = self.request.query_params.get("conference")
+        if conference_id:
+            queryset = queryset.filter(conference_id=conference_id)
+        return queryset
+
+
 class PresentationTypeViewSet(viewsets.ModelViewSet):
     """ViewSet для типов представления."""
 
@@ -363,7 +492,7 @@ class PresentationTypeViewSet(viewsets.ModelViewSet):
 class ProjectViewSet(viewsets.ModelViewSet):
     """ViewSet для проектов."""
 
-    queryset = Project.objects.filter(is_archived=False)
+    queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
     role_requirements = {
@@ -387,6 +516,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        include_archived = self.request.query_params.get("include_archived") == "1"
+        if not include_archived:
+            queryset = queryset.filter(is_archived=False)
         user = self.request.user
         if getattr(user, "is_superuser", False):
             return queryset
@@ -402,6 +534,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if is_student_role(role_code):
             return queryset.filter(Q(leader=user) | Q(members=user)).distinct()
         return queryset.none()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_archived = True
+        instance.save(update_fields=["is_archived"])
+        return Response({"status": "archived"})
 
 
 class CommentViewSet(viewsets.ModelViewSet):

@@ -52,10 +52,32 @@ export type ProjectStatus = {
   code: string;
 };
 
+export type ConferenceStatusFlowItem = {
+  id: number;
+  conference?: { id?: number; title?: string } | null;
+  status?: ProjectStatus | null;
+  order: number;
+  is_enabled: boolean;
+};
+
 export type ParticipationStage = {
   id: number;
   name: string;
   code: string;
+};
+
+export type ConferenceStageAvailability = {
+  id: number;
+  conference?: { id?: number; title?: string } | null;
+  stage?: ParticipationStage | null;
+  is_enabled: boolean;
+};
+
+export type ConferenceExpert = {
+  id: number;
+  conference?: { id?: number; title?: string } | null;
+  expert?: User | null;
+  sections?: Section[] | null;
 };
 
 export type Place = {

@@ -76,12 +76,12 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
             </div>
           </Link>
           {token ? (
-            <nav className="hidden items-center gap-4 text-sm font-medium text-muted-foreground lg:flex">
+            <nav className="hidden max-w-[60vw] items-center gap-4 overflow-x-auto whitespace-nowrap text-sm font-medium text-muted-foreground lg:flex">
               {navItems.map(item => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`transition-colors hover:text-foreground ${
+                  className={`shrink-0 transition-colors hover:text-foreground ${
                     location === item.href || location.startsWith(`${item.href}/`) ? "text-foreground" : ""
                   }`}
                 >

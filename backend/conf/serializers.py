@@ -5,6 +5,9 @@ from conf.models import (
     Section,
     ProjectStatus,
     ParticipationStage,
+    ConferenceStatusFlowItem,
+    ConferenceStageAvailability,
+    ConferenceExpert,
     Place,
     PresentationType,
     Project,
@@ -177,6 +180,69 @@ class ParticipationStageSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "is_archived",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ConferenceStatusFlowItemSerializer(serializers.ModelSerializer):
+    """Сериализатор для воронки статусов конференции."""
+
+    conference = ConferenceSerializer(read_only=True)
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+    )
+    status = ProjectStatusSerializer(read_only=True)
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProjectStatus.objects.all(),
+        source="status",
+        write_only=True,
+    )
+
+    class Meta:
+        model = ConferenceStatusFlowItem
+        fields = [
+            "id",
+            "conference",
+            "conference_id",
+            "status",
+            "status_id",
+            "order",
+            "is_enabled",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ConferenceStageAvailabilitySerializer(serializers.ModelSerializer):
+    """Сериализатор для доступных этапов конференции."""
+
+    conference = ConferenceSerializer(read_only=True)
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+    )
+    stage = ParticipationStageSerializer(read_only=True)
+    stage_id = serializers.PrimaryKeyRelatedField(
+        queryset=ParticipationStage.objects.all(),
+        source="stage",
+        write_only=True,
+    )
+
+    class Meta:
+        model = ConferenceStageAvailability
+        fields = [
+            "id",
+            "conference",
+            "conference_id",
+            "stage",
+            "stage_id",
+            "is_enabled",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -436,6 +502,52 @@ class ProjectResultSerializer(serializers.ModelSerializer):
             "is_archived",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ConferenceExpertSerializer(serializers.ModelSerializer):
+    """Сериализатор для экспертов конференции."""
+
+    conference = ConferenceSerializer(read_only=True)
+    conference_id = serializers.PrimaryKeyRelatedField(
+        queryset=Conference.objects.all(),
+        source="conference",
+        write_only=True,
+    )
+    expert = UserSerializer(read_only=True)
+    expert_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source="expert",
+        write_only=True,
+    )
+    sections = SectionSerializer(read_only=True, many=True)
+    section_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Section.objects.all(),
+        source="sections",
+        write_only=True,
+        many=True,
+        required=False,
+    )
+
+    class Meta:
+        model = ConferenceExpert
+        fields = [
+            "id",
+            "conference",
+            "conference_id",
+            "expert",
+            "expert_id",
+            "sections",
+            "section_ids",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_expert(self, value):
+        role_code = (getattr(value.role, "code", "") or "").lower()
+        if role_code != "expert":
+            raise serializers.ValidationError("Пользователь не является экспертом.")
+        return value
 
 
 class ExpertAssignmentItemSerializer(serializers.ModelSerializer):

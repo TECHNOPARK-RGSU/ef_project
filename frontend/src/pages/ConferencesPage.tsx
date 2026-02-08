@@ -8,13 +8,17 @@ import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type { Conference } from "@/lib/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
 export function ConferencesPage() {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [query, setQuery] = useState("");
+  const [formatFilter, setFormatFilter] = useState("all");
+  const [dateStartFilter, setDateStartFilter] = useState("");
+  const [dateEndFilter, setDateEndFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     title: "",
     startDate: "",
@@ -26,9 +30,9 @@ export function ConferencesPage() {
     prizesCount: "2",
   });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
-  const formRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,16 +52,45 @@ export function ConferencesPage() {
   }, []);
 
   const visibleConferences = useMemo(() => {
-    if (!query.trim()) return conferences;
-    const needle = query.toLowerCase();
-    return conferences.filter(item => item.title.toLowerCase().includes(needle));
-  }, [conferences, query]);
+    const needle = query.trim().toLowerCase();
+    return conferences.filter(item => {
+      if (needle && !item.title.toLowerCase().includes(needle)) return false;
+      if (formatFilter !== "all" && item.format !== formatFilter) return false;
+      if (dateStartFilter && item.start_date < dateStartFilter) return false;
+      if (dateEndFilter && item.end_date > dateEndFilter) return false;
+      return true;
+    });
+  }, [conferences, dateEndFilter, dateStartFilter, formatFilter, query]);
+  const perPage = 6;
+  const totalPages = Math.max(1, Math.ceil(visibleConferences.length / perPage));
+  const paginatedConferences = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return visibleConferences.slice(start, start + perPage);
+  }, [page, visibleConferences]);
+  useEffect(() => {
+    setPage(1);
+  }, [query, formatFilter, dateStartFilter, dateEndFilter]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const canSubmit =
     form.title.trim() && form.startDate && form.endDate && form.format;
 
   const handleCreateClick = () => {
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setEditingId(null);
+    setForm({
+      title: "",
+      startDate: "",
+      endDate: "",
+      location: "",
+      format: "online",
+      description: "",
+      winnersCount: "1",
+      prizesCount: "2",
+    });
+    setSubmitMessage(null);
+    setIsModalOpen(true);
   };
 
   const submitConference = async () => {
@@ -102,6 +135,7 @@ export function ConferencesPage() {
         prizesCount: "2",
       });
       setEditingId(null);
+      setIsModalOpen(false);
     } catch (error) {
       setSubmitState("error");
       setSubmitMessage(editingId ? "Не удалось обновить. Проверь API." : "Не удалось создать. Проверь API.");
@@ -120,6 +154,8 @@ export function ConferencesPage() {
       winnersCount: conf.winners_count ? String(conf.winners_count) : "1",
       prizesCount: conf.prizes_count ? String(conf.prizes_count) : "2",
     });
+    setSubmitMessage(null);
+    setIsModalOpen(true);
   };
 
   const cancelEdit = () => {
@@ -134,6 +170,8 @@ export function ConferencesPage() {
       winnersCount: "1",
       prizesCount: "2",
     });
+    setSubmitMessage(null);
+    setIsModalOpen(false);
   };
 
   const deleteConference = async (id: number) => {
@@ -175,139 +213,57 @@ export function ConferencesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div ref={formRef}>
       <Card className="border-border/70 bg-card/80">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {editingId ? "Редактирование конференции" : "Новая конференция"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="conf-title">Название</Label>
-                <Input
-                  id="conf-title"
-                  value={form.title}
-                  onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
-                  placeholder="Название конференции"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Формат</Label>
-                <Select
-                  value={form.format}
-                  onValueChange={value => setForm(current => ({ ...current, format: value }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Формат" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="online">Онлайн</SelectItem>
-                    <SelectItem value="hybrid">Гибрид</SelectItem>
-                    <SelectItem value="offline">Очный</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="conf-start">Дата начала</Label>
-                <Input
-                  id="conf-start"
-                  type="date"
-                  value={form.startDate}
-                  onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="conf-end">Дата окончания</Label>
-                <Input
-                  id="conf-end"
-                  type="date"
-                  value={form.endDate}
-                  onChange={event => setForm(current => ({ ...current, endDate: event.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="conf-location">Локация</Label>
-              <Input
-                id="conf-location"
-                value={form.location}
-                onChange={event => setForm(current => ({ ...current, location: event.target.value }))}
-                placeholder="Место проведения"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="conf-desc">Описание</Label>
-              <Textarea
-                id="conf-desc"
-                value={form.description}
-                onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
-                placeholder="Краткое описание конференции"
-              />
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Победители в секции</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={form.winnersCount}
-                  onChange={event =>
-                    setForm(current => ({ ...current, winnersCount: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Призёры в секции</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={form.prizesCount}
-                  onChange={event =>
-                    setForm(current => ({ ...current, prizesCount: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            {submitMessage ? <p className="text-xs text-muted-foreground">{submitMessage}</p> : null}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                className="w-full md:w-auto"
-                disabled={!canSubmit || submitState === "saving"}
-                onClick={submitConference}
-              >
-                {submitState === "saving"
-                  ? "Сохраняем…"
-                  : editingId
-                    ? "Сохранить"
-                    : "Создать конференцию"}
-              </Button>
-              {editingId ? (
-                <Button variant="outline" onClick={cancelEdit}>
-                  Отмена
-                </Button>
-              ) : null}
-            </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <Input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Поиск по названию"
-            className="md:max-w-sm"
-          />
-          <p className="text-sm text-muted-foreground">
-            {visibleConferences.length} {visibleConferences.length === 1 ? "конференция" : "конференции"}
-          </p>
-        </div>
-      </div>
+        <CardHeader>
+          <CardTitle className="text-lg">Поиск и фильтры</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-4">
+          <div className="space-y-2 md:col-span-2">
+            <Label>Поиск</Label>
+            <Input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Название конференции"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Формат</Label>
+            <Select value={formatFilter} onValueChange={setFormatFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Все форматы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все форматы</SelectItem>
+                <SelectItem value="online">Онлайн</SelectItem>
+                <SelectItem value="hybrid">Гибрид</SelectItem>
+                <SelectItem value="offline">Очный</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Дата начала (от)</Label>
+            <Input
+              type="date"
+              value={dateStartFilter}
+              onChange={event => setDateStartFilter(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Дата окончания (до)</Label>
+            <Input
+              type="date"
+              value={dateEndFilter}
+              onChange={event => setDateEndFilter(event.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <p className="text-xs text-muted-foreground">
+              {visibleConferences.length}{" "}
+              {visibleConferences.length === 1 ? "конференция" : "конференции"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         {state === "loading" && !conferences.length ? (
@@ -316,8 +272,8 @@ export function ConferencesPage() {
               Загружаем список конференций…
             </CardContent>
           </Card>
-        ) : visibleConferences.length ? (
-          visibleConferences.map(conf => (
+        ) : paginatedConferences.length ? (
+          paginatedConferences.map(conf => (
             <Card key={conf.id} className="border-border/70 bg-card/80">
               <CardHeader className="space-y-2">
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -350,6 +306,140 @@ export function ConferencesPage() {
           </Card>
         )}
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <span>
+          Показано {paginatedConferences.length} из {visibleConferences.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+            Назад
+          </Button>
+          <span>
+            {page} / {totalPages}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          >
+            Вперёд
+          </Button>
+        </div>
+      </div>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-3xl border-border/70 bg-card/95">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg">
+                  {editingId ? "Редактирование конференции" : "Новая конференция"}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Заполните основные параметры конференции.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                Закрыть
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="conf-title">Название</Label>
+                  <Input
+                    id="conf-title"
+                    value={form.title}
+                    onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
+                    placeholder="Название конференции"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Формат</Label>
+                  <Select value={form.format} onValueChange={value => setForm(current => ({ ...current, format: value }))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Формат" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="online">Онлайн</SelectItem>
+                      <SelectItem value="hybrid">Гибрид</SelectItem>
+                      <SelectItem value="offline">Очный</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="conf-start">Дата начала</Label>
+                  <Input
+                    id="conf-start"
+                    type="date"
+                    value={form.startDate}
+                    onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="conf-end">Дата окончания</Label>
+                  <Input
+                    id="conf-end"
+                    type="date"
+                    value={form.endDate}
+                    onChange={event => setForm(current => ({ ...current, endDate: event.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="conf-location">Локация</Label>
+                <Input
+                  id="conf-location"
+                  value={form.location}
+                  onChange={event => setForm(current => ({ ...current, location: event.target.value }))}
+                  placeholder="Место проведения"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="conf-desc">Описание</Label>
+                <Textarea
+                  id="conf-desc"
+                  value={form.description}
+                  onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
+                  placeholder="Краткое описание конференции"
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Победители в секции</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={form.winnersCount}
+                    onChange={event => setForm(current => ({ ...current, winnersCount: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Призёры в секции</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={form.prizesCount}
+                    onChange={event => setForm(current => ({ ...current, prizesCount: event.target.value }))}
+                  />
+                </div>
+              </div>
+              {submitMessage ? <p className="text-xs text-muted-foreground">{submitMessage}</p> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button className="w-full md:w-auto" disabled={!canSubmit || submitState === "saving"} onClick={submitConference}>
+                  {submitState === "saving" ? "Сохраняем…" : editingId ? "Сохранить" : "Создать конференцию"}
+                </Button>
+                <Button variant="outline" onClick={cancelEdit}>
+                  Отмена
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </section>
   );
 }

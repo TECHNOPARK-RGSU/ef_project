@@ -173,6 +173,64 @@ class ParticipationStage(BaseModel):
         ordering = ["name"]
 
 
+class ConferenceStatusFlowItem(BaseModel):
+    """Настройка воронки статусов для конференции."""
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="status_flow_items",
+        verbose_name="Конференция",
+    )
+    status = models.ForeignKey(
+        ProjectStatus,
+        on_delete=models.CASCADE,
+        related_name="conference_status_items",
+        verbose_name="Статус",
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Порядок",
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Активен",
+    )
+
+    class Meta:
+        verbose_name = "Воронка статусов конференции"
+        verbose_name_plural = "Воронки статусов конференций"
+        ordering = ["order", "id"]
+        unique_together = ("conference", "status")
+
+
+class ConferenceStageAvailability(BaseModel):
+    """Доступные этапы участия для конференции."""
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="stage_items",
+        verbose_name="Конференция",
+    )
+    stage = models.ForeignKey(
+        ParticipationStage,
+        on_delete=models.CASCADE,
+        related_name="conference_stage_items",
+        verbose_name="Этап",
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Активен",
+    )
+
+    class Meta:
+        verbose_name = "Этап участия конференции"
+        verbose_name_plural = "Этапы участия конференций"
+        ordering = ["stage__name", "id"]
+        unique_together = ("conference", "stage")
+
+
 class Place(BaseModel):
     """Место проведения."""
 
@@ -490,6 +548,34 @@ class ProjectResult(BaseModel):
     class Meta:
         verbose_name = "Результат проекта"
         verbose_name_plural = "Результаты проектов"
+
+
+class ConferenceExpert(BaseModel):
+    """Эксперт, приглашенный в конференцию, с ограничением по секциям."""
+
+    conference = models.ForeignKey(
+        Conference,
+        on_delete=models.CASCADE,
+        related_name="conference_experts",
+        verbose_name="Конференция",
+    )
+    expert = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="conference_expert_roles",
+        verbose_name="Эксперт",
+    )
+    sections = models.ManyToManyField(
+        Section,
+        blank=True,
+        related_name="conference_experts",
+        verbose_name="Секции эксперта",
+    )
+
+    class Meta:
+        verbose_name = "Эксперт конференции"
+        verbose_name_plural = "Эксперты конференций"
+        unique_together = ("conference", "expert")
 
 
 class ExpertAssignment(BaseModel):

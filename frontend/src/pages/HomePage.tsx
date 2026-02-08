@@ -1,21 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { API_BASE_URL, fetchList } from "@/lib/api";
-import { getAuthUserInfo } from "@/lib/auth";
-import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
-import type { Conference, Section } from "@/lib/types";
+import { API_BASE_URL } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 
 export function HomePage() {
-  const authUser = getAuthUserInfo();
-  const isGuest = !authUser?.id;
-  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
-  const isStudentRole = isStudentRoleCode(roleCode);
-  const isTutorRole = roleCode === "tutor";
-  const isExpertRole = roleCode === "expert";
-  const [conferences, setConferences] = useState<Conference[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
   const [publicStats, setPublicStats] = useState<{
     conferences: number;
     sections: number;
@@ -23,79 +12,6 @@ export function HomePage() {
     participants: number;
     experts: number;
   } | null>(null);
-  const roleContext =
-    isStudentRole || isTutorRole
-      ? {
-          label: isTutorRole ? "Наставник" : "Участник",
-          title: isTutorRole ? "Работа с проектами" : "Мои заявки",
-          description: isTutorRole
-            ? "Добавляйте и редактируйте проекты учеников."
-            : "Создавайте и обновляйте проекты в личном кабинете.",
-          actions: [{ label: "Открыть проекты", href: "/apply" }],
-          primaryHref: "/apply",
-          primaryLabel: "Мои проекты",
-        }
-      : isExpertRole
-        ? {
-            label: "Эксперт",
-            title: "Проверка работ",
-            description: "Скачивайте работы и выставляйте оценки по критериям.",
-            actions: [
-              { label: "Назначения", href: "/assignments" },
-              { label: "Оценки", href: "/scores" },
-              { label: "Комментарии", href: "/comments" },
-            ],
-            primaryHref: "/assignments",
-            primaryLabel: "Мои назначения",
-          }
-        : roleCode === "organizer"
-          ? {
-              label: "Организатор",
-              title: "Рабочая панель",
-              description: "Управляйте конференциями, секциями и пользователями.",
-              actions: [
-                { label: "Конференции", href: "/conferences" },
-                { label: "Секции", href: "/sections" },
-                { label: "Пользователи", href: "/users" },
-                { label: "Критерии", href: "/criteria" },
-                { label: "Назначения", href: "/assignments" },
-                { label: "Оценки", href: "/scores" },
-              ],
-              primaryHref: "/conferences",
-              primaryLabel: "Конференции",
-            }
-          : null;
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const load = async () => {
-      try {
-        const items = await fetchList<Conference>("/api/conf/conferences/", controller.signal);
-        setConferences(items.slice(0, 6));
-      } catch (error) {
-        if (!controller.signal.aborted) setConferences([]);
-      }
-    };
-
-    load();
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const loadMeta = async () => {
-      try {
-        const items = await fetchList<Section>("/api/conf/sections/", controller.signal);
-        setSections(items);
-      } catch {
-        setSections([]);
-      }
-    };
-
-    loadMeta();
-    return () => controller.abort();
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,7 +45,7 @@ export function HomePage() {
 
   const stats = [
     {
-      value: publicStats ? String(publicStats.conferences) : String(conferences.length),
+      value: publicStats ? String(publicStats.conferences) : "—",
       label: "Проведено конференций",
     },
     {
@@ -153,23 +69,15 @@ export function HomePage() {
             Projectaris помогает работать с конференциями, проектами и экспертизой в одном месте
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground">
-            Участникам — быстрые заявки, наставникам — контроль проектов, экспертам — оценка, организаторам — управление процессом.
+            Для участников, наставников, экспертов и организаторов — единая платформа с понятными сценариями работы.
           </p>
           <div className="flex flex-wrap gap-3">
-            {isGuest ? (
-              <>
-                <Button size="lg" asChild>
-                  <Link href="/login">Войти</Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <Link href="/register">Регистрация</Link>
-                </Button>
-              </>
-            ) : roleContext ? (
-              <Button size="lg" asChild>
-                <Link href={roleContext.primaryHref}>{roleContext.primaryLabel}</Link>
-              </Button>
-            ) : null}
+            <Button size="lg" asChild>
+              <Link href="/login">Войти</Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/register">Регистрация</Link>
+            </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {stats.map(item => (
@@ -189,32 +97,22 @@ export function HomePage() {
           <div className="pointer-events-none absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/15 blur-3xl opacity-70" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-background/10 to-background/40" />
           <CardHeader className="space-y-1 relative z-10">
-            <CardTitle className="text-xl">{roleContext ? roleContext.title : "Начать работу"}</CardTitle>
+            <CardTitle className="text-xl">Начать работу</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {roleContext ? roleContext.description : "Создайте аккаунт или войдите, чтобы получить доступ к личному кабинету."}
+              Зарегистрируйтесь или войдите, чтобы получить доступ к личному кабинету.
             </p>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground relative z-10">
-            {roleContext ? (
-              <div className="grid gap-2">
-                {roleContext.actions.map(action => (
-                  <Button key={action.href} variant="outline" className="w-full" asChild>
-                    <Link href={action.href}>{action.label}</Link>
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                <Button className="w-full" variant="outline" asChild>
-                  <Link href="/login">Войти</Link>
-                </Button>
-                <Button className="w-full" asChild>
-                  <Link href="/register">Регистрация</Link>
-                </Button>
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Button className="w-full" variant="outline" asChild>
+                <Link href="/login">Войти</Link>
+              </Button>
+              <Button className="w-full" asChild>
+                <Link href="/register">Регистрация</Link>
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              {roleContext ? "Функции доступны согласно вашей роли." : "Регистрация открывает доступ к личному кабинету."}
+              После входа откроется раздел, доступный вашей роли.
             </p>
           </CardContent>
         </Card>

@@ -5,8 +5,10 @@ import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import type {
   Conference,
+  ConferenceExpert,
+  ConferenceStageAvailability,
+  ConferenceStatusFlowItem,
   EvaluationCriterion,
-  Project,
   ProjectResult,
   Section,
   User,
@@ -29,23 +31,28 @@ export function ConferenceDetailPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>([]);
   const [results, setResults] = useState<ProjectResult[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [criteriaMessage, setCriteriaMessage] = useState<string | null>(null);
-  const [scoreMessage, setScoreMessage] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [statusFlowItems, setStatusFlowItems] = useState<ConferenceStatusFlowItem[]>([]);
+  const [stageItems, setStageItems] = useState<ConferenceStageAvailability[]>([]);
+  const [statusFlowMessage, setStatusFlowMessage] = useState<string | null>(null);
+  const [stageMessage, setStageMessage] = useState<string | null>(null);
+  const [conferenceExperts, setConferenceExperts] = useState<ConferenceExpert[]>([]);
+  const [expertUsers, setExpertUsers] = useState<User[]>([]);
+  const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
+  const [editingExpertId, setEditingExpertId] = useState<number | null>(null);
+  const [expertForm, setExpertForm] = useState<{ expertId: string; sectionIds: string[] }>({
+    expertId: "",
+    sectionIds: [],
+  });
   const [criteriaForm, setCriteriaForm] = useState({
     name: "",
     description: "",
     maxScore: "10",
     stage: "online",
   });
-  const [scoreForm, setScoreForm] = useState({
-    projectId: "",
-    criterionId: "",
-    evaluatorId: "",
-    score: "",
-  });
+  const [editingCriterionId, setEditingCriterionId] = useState<number | null>(null);
+  const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -81,18 +88,34 @@ export function ConferenceDetailPage() {
       const tasks = await Promise.allSettled([
         fetchList<EvaluationCriterion>(`/api/conf/criteria/?conference=${id}`, controller.signal),
         fetchList<ProjectResult>(`/api/conf/results/?conference=${id}`, controller.signal),
-        fetchList<Project>(`/api/conf/projects/`, controller.signal),
-        fetchList<User>(`/api/users/users/`, controller.signal),
+        isOrganizerRole
+          ? fetchList<ConferenceStatusFlowItem>(
+              `/api/conf/conference-status-flow/?conference=${id}`,
+              controller.signal,
+            )
+          : Promise.resolve([] as ConferenceStatusFlowItem[]),
+        isOrganizerRole
+          ? fetchList<ConferenceStageAvailability>(
+              `/api/conf/conference-stages/?conference=${id}`,
+              controller.signal,
+            )
+          : Promise.resolve([] as ConferenceStageAvailability[]),
+        isOrganizerRole
+          ? fetchList<ConferenceExpert>(`/api/conf/conference-experts/?conference=${id}`, controller.signal)
+          : Promise.resolve([] as ConferenceExpert[]),
+        isOrganizerRole ? fetchList<User>(`/api/users/users/`, controller.signal) : Promise.resolve([] as User[]),
       ]);
       if (controller.signal.aborted) return;
       if (tasks[0].status === "fulfilled") setCriteria(tasks[0].value);
       if (tasks[1].status === "fulfilled") setResults(tasks[1].value);
-      if (tasks[2].status === "fulfilled") setProjects(tasks[2].value);
-      if (tasks[3].status === "fulfilled") setUsers(tasks[3].value);
+      if (tasks[2].status === "fulfilled") setStatusFlowItems(tasks[2].value);
+      if (tasks[3].status === "fulfilled") setStageItems(tasks[3].value);
+      if (tasks[4].status === "fulfilled") setConferenceExperts(tasks[4].value);
+      if (tasks[5].status === "fulfilled") setExpertUsers(tasks[5].value);
     };
     loadMeta();
     return () => controller.abort();
-  }, [id]);
+  }, [id, isOrganizerRole]);
 
   const visibleConference = conference || null;
   const visibleSections = useMemo(() => {
@@ -106,15 +129,27 @@ export function ConferenceDetailPage() {
         format: section.conference?.title ?? "Конференция не указана",
       }));
   }, [sections, id]);
-
-  const conferenceProjects = useMemo(() => {
-    if (!projects.length) return [];
-    return projects.filter(project => project.section?.conference?.id === id);
-  }, [projects, id]);
-  const expertUsers = useMemo(
-    () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "expert"),
-    [users],
-  );
+  const conferenceSections = useMemo(() => {
+    if (!sections.length) return [];
+    return sections.filter(section => section.conference?.id === id);
+  }, [sections, id]);
+  const orderedStatusFlow = useMemo(() => {
+    return [...statusFlowItems].sort((a, b) => a.order - b.order);
+  }, [statusFlowItems]);
+  const orderedStageItems = useMemo(() => {
+    return [...stageItems].sort((a, b) => {
+      const aName = a.stage?.name ?? "";
+      const bName = b.stage?.name ?? "";
+      return aName.localeCompare(bName);
+    });
+  }, [stageItems]);
+  const availableExperts = useMemo(() => {
+    return expertUsers.filter(user => (user.role?.code ?? "").toLowerCase() === "expert");
+  }, [expertUsers]);
+  const selectableExperts = useMemo(() => {
+    const used = new Set(conferenceExperts.map(item => item.expert?.id).filter(Boolean) as number[]);
+    return availableExperts.filter(user => !used.has(user.id) || String(user.id) === expertForm.expertId);
+  }, [availableExperts, conferenceExperts, expertForm.expertId]);
 
   const submitCriterion = async () => {
     setCriteriaMessage(null);
@@ -124,8 +159,11 @@ export function ConferenceDetailPage() {
       setCriteriaMessage("Нужен токен для добавления критерия.");
       return;
     }
-    const response = await fetch(`${API_BASE_URL}/api/conf/criteria/`, {
-      method: "POST",
+    const endpoint = editingCriterionId
+      ? `/api/conf/criteria/${editingCriterionId}/`
+      : "/api/conf/criteria/";
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: editingCriterionId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
       body: JSON.stringify({
         conference_id: id,
@@ -140,35 +178,105 @@ export function ConferenceDetailPage() {
       return;
     }
     const created = (await response.json()) as EvaluationCriterion;
-    setCriteria(current => [created, ...current]);
+    setCriteria(current =>
+      editingCriterionId
+        ? current.map(item => (item.id === editingCriterionId ? created : item))
+        : [created, ...current],
+    );
     setCriteriaForm({ name: "", description: "", maxScore: "10", stage: "online" });
-    setCriteriaMessage("Критерий добавлен.");
+    setCriteriaMessage(editingCriterionId ? "Критерий обновлен." : "Критерий добавлен.");
+    setEditingCriterionId(null);
+    setIsCriteriaModalOpen(false);
   };
 
-  const submitScore = async () => {
-    setScoreMessage(null);
-    if (!scoreForm.projectId || !scoreForm.criterionId || !scoreForm.score) return;
+  const updateStatusFlowItem = async (
+    itemId: number,
+    updates: Partial<Pick<ConferenceStatusFlowItem, "is_enabled" | "order">>,
+  ) => {
+    setStatusFlowMessage(null);
     const token = getAuthToken();
     if (!token) {
-      setScoreMessage("Нужен токен для сохранения оценки.");
+      setStatusFlowMessage("Нужен токен для обновления воронки.");
       return;
     }
-    const response = await fetch(`${API_BASE_URL}/api/conf/scores/`, {
-      method: "POST",
+    const response = await fetch(`${API_BASE_URL}/api/conf/conference-status-flow/${itemId}/`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-      body: JSON.stringify({
-        project_id: Number(scoreForm.projectId),
-        criterion_id: Number(scoreForm.criterionId),
-        evaluator_id: scoreForm.evaluatorId ? Number(scoreForm.evaluatorId) : null,
-        score: Number(scoreForm.score),
-      }),
+      body: JSON.stringify(updates),
     });
     if (!response.ok) {
-      setScoreMessage("Не удалось сохранить оценку.");
+      setStatusFlowMessage("Не удалось обновить воронку.");
       return;
     }
-    setScoreForm({ projectId: "", criterionId: "", evaluatorId: "", score: "" });
-    setScoreMessage("Оценка сохранена.");
+    const updated = (await response.json()) as ConferenceStatusFlowItem;
+    setStatusFlowItems(current => current.map(item => (item.id === itemId ? updated : item)));
+  };
+
+  const swapStatusFlowOrder = async (fromId: number, toId: number) => {
+    const from = statusFlowItems.find(item => item.id === fromId);
+    const to = statusFlowItems.find(item => item.id === toId);
+    if (!from || !to) return;
+    await Promise.all([
+      updateStatusFlowItem(from.id, { order: to.order }),
+      updateStatusFlowItem(to.id, { order: from.order }),
+    ]);
+  };
+
+  const toggleStageItem = async (itemId: number, isEnabled: boolean) => {
+    setStageMessage(null);
+    const token = getAuthToken();
+    if (!token) {
+      setStageMessage("Нужен токен для обновления этапов.");
+      return;
+    }
+    const response = await fetch(`${API_BASE_URL}/api/conf/conference-stages/${itemId}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+      body: JSON.stringify({ is_enabled: isEnabled }),
+    });
+    if (!response.ok) {
+      setStageMessage("Не удалось обновить этапы.");
+      return;
+    }
+    const updated = (await response.json()) as ConferenceStageAvailability;
+    setStageItems(current => current.map(item => (item.id === itemId ? updated : item)));
+  };
+
+  const saveConferenceExpert = async () => {
+    if (!id || !expertForm.expertId) return;
+    const token = getAuthToken();
+    if (!token) return;
+    const endpoint = editingExpertId
+      ? `/api/conf/conference-experts/${editingExpertId}/`
+      : "/api/conf/conference-experts/";
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: editingExpertId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+      body: JSON.stringify({
+        conference_id: id,
+        expert_id: Number(expertForm.expertId),
+        section_ids: expertForm.sectionIds.map(idItem => Number(idItem)),
+      }),
+    });
+    if (!response.ok) return;
+    const updated = (await response.json()) as ConferenceExpert;
+    setConferenceExperts(current =>
+      editingExpertId ? current.map(item => (item.id === editingExpertId ? updated : item)) : [updated, ...current],
+    );
+    setEditingExpertId(null);
+    setExpertForm({ expertId: "", sectionIds: [] });
+    setIsExpertModalOpen(false);
+  };
+
+  const removeConferenceExpert = async (itemId: number) => {
+    const token = getAuthToken();
+    if (!token) return;
+    const response = await fetch(`${API_BASE_URL}/api/conf/conference-experts/${itemId}/`, {
+      method: "DELETE",
+      headers: { Authorization: `Token ${token}` },
+    });
+    if (!response.ok) return;
+    setConferenceExperts(current => current.filter(item => item.id !== itemId));
   };
 
   const runCalculation = async () => {
@@ -205,6 +313,9 @@ export function ConferenceDetailPage() {
     if (!response.ok) {
       setResultMessage("Не удалось опубликовать результаты.");
       return;
+    }
+    if (conference) {
+      setConference({ ...conference, results_published: true });
     }
     setResultMessage("Результаты опубликованы.");
   };
@@ -323,25 +434,28 @@ export function ConferenceDetailPage() {
 
         <Card className="border-border/70 bg-card/85">
           <CardHeader className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Статус</p>
-            <CardTitle className="text-lg">Подготовка</CardTitle>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Результаты</p>
+            <CardTitle className="text-lg">Публикация и доступ</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>{state === "loading" ? "Загружаем данные…" : "Планируем приём заявок"}</p>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span>Секции готовы</span>
-                <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">70%</span>
-              </div>
-              <div className="h-2 rounded-full bg-primary/20">
-                <div className="h-full w-[70%] rounded-full bg-primary" />
-              </div>
-            </div>
-            {isOrganizerRole ? (
-              <Button className="w-full" variant="outline" asChild>
-                <Link href="/conferences">Изменить в списке конференций</Link>
+            <p>Статус: {conference?.results_published ? "опубликованы" : "черновик"}</p>
+            <p>Опубликованные результаты видят участники, наставники и эксперты.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={runCalculation}>
+                Пересчитать
               </Button>
-            ) : null}
+              <Button onClick={publishResults}>Опубликовать</Button>
+              <Button variant="outline" onClick={() => downloadResults("csv")}>
+                Экспорт CSV
+              </Button>
+              <Button variant="outline" onClick={() => downloadResults("xlsx")}>
+                Экспорт XLSX
+              </Button>
+              <Button variant="outline" onClick={openPrintProtocol}>
+                Протокол
+              </Button>
+            </div>
+            {resultMessage ? <p>{resultMessage}</p> : null}
           </CardContent>
         </Card>
       </div>
@@ -349,62 +463,23 @@ export function ConferenceDetailPage() {
       <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-border/70 bg-card/80">
           <CardHeader>
-            <CardTitle className="text-lg">Критерии оценки</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-lg">Критерии оценки</CardTitle>
+              {isOrganizerRole ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingCriterionId(null);
+                    setCriteriaForm({ name: "", description: "", maxScore: "10", stage: "online" });
+                    setIsCriteriaModalOpen(true);
+                  }}
+                >
+                  Добавить
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            {isOrganizerRole ? (
-              <>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Критерий</Label>
-                    <Input
-                      value={criteriaForm.name}
-                      onChange={event => setCriteriaForm(current => ({ ...current, name: event.target.value }))}
-                      placeholder="Название критерия"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Этап</Label>
-                    <Select
-                      value={criteriaForm.stage}
-                      onValueChange={value => setCriteriaForm(current => ({ ...current, stage: value }))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Этап" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="online">Заочный</SelectItem>
-                        <SelectItem value="offline">Очный</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Максимум баллов</Label>
-                    <Input
-                      type="number"
-                      value={criteriaForm.maxScore}
-                      onChange={event =>
-                        setCriteriaForm(current => ({ ...current, maxScore: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Описание</Label>
-                    <Textarea
-                      value={criteriaForm.description}
-                      onChange={event =>
-                        setCriteriaForm(current => ({ ...current, description: event.target.value }))
-                      }
-                      placeholder="Краткое описание"
-                    />
-                  </div>
-                </div>
-                {criteriaMessage ? <p>{criteriaMessage}</p> : null}
-                <Button onClick={submitCriterion}>Добавить критерий</Button>
-              </>
-            ) : null}
             <div className="space-y-2">
               {criteria.length ? (
                 criteria.map(criterion => (
@@ -412,6 +487,26 @@ export function ConferenceDetailPage() {
                     <p className="font-semibold text-foreground">{criterion.name}</p>
                     <p>Этап: {criterion.stage === "online" ? "заочный" : "очный"}</p>
                     <p>Максимум: {criterion.max_score}</p>
+                    {isOrganizerRole ? (
+                      <div className="pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingCriterionId(criterion.id);
+                            setCriteriaForm({
+                              name: criterion.name,
+                              description: criterion.description ?? "",
+                              maxScore: String(criterion.max_score),
+                              stage: criterion.stage,
+                            });
+                            setIsCriteriaModalOpen(true);
+                          }}
+                        >
+                          Редактировать
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -423,94 +518,317 @@ export function ConferenceDetailPage() {
 
         <Card className="border-border/70 bg-card/80">
           <CardHeader>
-            <CardTitle className="text-lg">Оценка проекта</CardTitle>
+            <CardTitle className="text-lg">Проекты и результаты</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="space-y-2">
-              <Label>Проект</Label>
-              <Select
-                value={scoreForm.projectId}
-                onValueChange={value => setScoreForm(current => ({ ...current, projectId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите проект" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conferenceProjects.length ? (
-                    conferenceProjects.map(project => (
-                      <SelectItem key={project.id} value={String(project.id)}>
-                        {project.title}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет проектов
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Критерий</Label>
-              <Select
-                value={scoreForm.criterionId}
-                onValueChange={value => setScoreForm(current => ({ ...current, criterionId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите критерий" />
-                </SelectTrigger>
-                <SelectContent>
-                  {criteria.length ? (
-                    criteria.map(criterion => (
-                      <SelectItem key={criterion.id} value={String(criterion.id)}>
-                        {criterion.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет критериев
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Оценщик</Label>
-              <Select
-                value={scoreForm.evaluatorId}
-                onValueChange={value => setScoreForm(current => ({ ...current, evaluatorId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите пользователя" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expertUsers.length ? (
-                    expertUsers.map(user => (
-                      <SelectItem key={user.id} value={String(user.id)}>
-                        {user.last_name} {user.first_name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет пользователей
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Баллы</Label>
-              <Input
-                type="number"
-                value={scoreForm.score}
-                onChange={event => setScoreForm(current => ({ ...current, score: event.target.value }))}
-              />
-            </div>
-            {scoreMessage ? <p>{scoreMessage}</p> : null}
-            <Button onClick={submitScore}>Сохранить оценку</Button>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            {results.length ? (
+              results.slice(0, 5).map(item => (
+                <p key={item.id}>
+                  {item.project.title}: {item.total_score} баллов, место {item.rank}
+                </p>
+              ))
+            ) : (
+              <p>Результаты будут доступны после расчёта.</p>
+            )}
+            <Button variant="outline" asChild>
+              <Link href="/scores">Перейти к оценкам</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
+
+      {isCriteriaModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-2xl border-border/70 bg-card/95">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg">
+                  {editingCriterionId ? "Редактирование критерия" : "Новый критерий"}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Критерий будет доступен только для этой конференции.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsCriteriaModalOpen(false)}>
+                Закрыть
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Критерий</Label>
+                  <Input
+                    value={criteriaForm.name}
+                    onChange={event => setCriteriaForm(current => ({ ...current, name: event.target.value }))}
+                    placeholder="Название критерия"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Этап</Label>
+                  <Select
+                    value={criteriaForm.stage}
+                    onValueChange={value => setCriteriaForm(current => ({ ...current, stage: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Этап" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="online">Заочный</SelectItem>
+                      <SelectItem value="offline">Очный</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Максимум баллов</Label>
+                  <Input
+                    type="number"
+                    value={criteriaForm.maxScore}
+                    onChange={event => setCriteriaForm(current => ({ ...current, maxScore: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Описание</Label>
+                  <Textarea
+                    value={criteriaForm.description}
+                    onChange={event => setCriteriaForm(current => ({ ...current, description: event.target.value }))}
+                    placeholder="Краткое описание"
+                  />
+                </div>
+              </div>
+              {criteriaMessage ? <p>{criteriaMessage}</p> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={submitCriterion}>
+                  {editingCriterionId ? "Сохранить" : "Добавить критерий"}
+                </Button>
+                <Button variant="outline" onClick={() => setIsCriteriaModalOpen(false)}>
+                  Отмена
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {isExpertModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-2xl border-border/70 bg-card/95">
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg">
+                  {editingExpertId ? "Настройка эксперта" : "Добавить эксперта"}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Выберите эксперта и секции, которые он может оценивать.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsExpertModalOpen(false)}>
+                Закрыть
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="space-y-2">
+                <Label>Эксперт</Label>
+                <Select
+                  value={expertForm.expertId || undefined}
+                  onValueChange={value => setExpertForm(current => ({ ...current, expertId: value }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите эксперта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectableExperts.length ? (
+                      selectableExperts.map(user => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {user.last_name} {user.first_name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет экспертов
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Секции</Label>
+                <div className="grid gap-2">
+                  {conferenceSections.length ? (
+                    conferenceSections.map(section => (
+                      <label key={section.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-background/70 p-2">
+                        <input
+                          type="checkbox"
+                          checked={expertForm.sectionIds.includes(String(section.id))}
+                          onChange={event => {
+                            setExpertForm(current => {
+                              const next = new Set(current.sectionIds);
+                              if (event.target.checked) {
+                                next.add(String(section.id));
+                              } else {
+                                next.delete(String(section.id));
+                              }
+                              return { ...current, sectionIds: Array.from(next) };
+                            });
+                          }}
+                        />
+                        <span>{section.name}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <p>Секции конференции не найдены.</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Если секции не выбраны, эксперт видит все секции.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={saveConferenceExpert}>
+                  {editingExpertId ? "Сохранить" : "Добавить"}
+                </Button>
+                <Button variant="outline" onClick={() => setIsExpertModalOpen(false)}>
+                  Отмена
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {isOrganizerRole ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">Воронка статусов</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {orderedStatusFlow.length ? (
+                orderedStatusFlow.map((item, index) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background/70 p-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.is_enabled}
+                        onChange={event => updateStatusFlowItem(item.id, { is_enabled: event.target.checked })}
+                      />
+                      <span>{item.status?.name ?? "Без названия"}</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={index === 0}
+                        onClick={() => {
+                          const targetId = orderedStatusFlow[index - 1]?.id;
+                          if (targetId) swapStatusFlowOrder(item.id, targetId);
+                        }}
+                      >
+                        Вверх
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={index === orderedStatusFlow.length - 1}
+                        onClick={() => {
+                          const targetId = orderedStatusFlow[index + 1]?.id;
+                          if (targetId) swapStatusFlowOrder(item.id, targetId);
+                        }}
+                      >
+                        Вниз
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p>Статусы загрузятся после создания конференции.</p>
+              )}
+              {statusFlowMessage ? <p>{statusFlowMessage}</p> : null}
+            </CardContent>
+          </Card>
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">Этапы участия</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {orderedStageItems.length ? (
+                orderedStageItems.map(item => (
+                  <label key={item.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-background/70 p-2">
+                    <input
+                      type="checkbox"
+                      checked={item.is_enabled}
+                      onChange={event => toggleStageItem(item.id, event.target.checked)}
+                    />
+                    <span>{item.stage?.name ?? "Этап"}</span>
+                  </label>
+                ))
+              ) : (
+                <p>Этапы загрузятся после создания конференции.</p>
+              )}
+              {stageMessage ? <p>{stageMessage}</p> : null}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {isOrganizerRole ? (
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-lg">Эксперты конференции</CardTitle>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingExpertId(null);
+                setExpertForm({ expertId: "", sectionIds: [] });
+                setIsExpertModalOpen(true);
+              }}
+            >
+              Добавить эксперта
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            {conferenceExperts.length ? (
+              conferenceExperts.map(item => (
+                <div key={item.id} className="rounded-md border border-border/60 bg-background/70 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {item.expert?.last_name} {item.expert?.first_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Секции:{" "}
+                        {item.sections?.length
+                          ? item.sections.map(section => section.name).join(", ")
+                          : "все секции"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingExpertId(item.id);
+                          setExpertForm({
+                            expertId: item.expert?.id ? String(item.expert.id) : "",
+                            sectionIds: item.sections?.map(section => String(section.id)) ?? [],
+                          });
+                          setIsExpertModalOpen(true);
+                        }}
+                      >
+                        Настроить
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => removeConferenceExpert(item.id)}>
+                        Удалить
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>Эксперты пока не приглашены.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="space-y-3">
         <h2 className="text-xl font-semibold">Секции конференции</h2>
@@ -540,23 +858,6 @@ export function ConferenceDetailPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Результаты</h2>
-          {isOrganizerRole ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={runCalculation}>
-                Рассчитать
-              </Button>
-              <Button variant="outline" onClick={() => downloadResults("csv")}>
-                Экспорт CSV
-              </Button>
-              <Button variant="outline" onClick={() => downloadResults("xlsx")}>
-                Экспорт Excel
-              </Button>
-              <Button variant="outline" onClick={openPrintProtocol}>
-                Печать протокола
-              </Button>
-              <Button onClick={publishResults}>Опубликовать</Button>
-            </div>
-          ) : null}
         </div>
         {resultMessage ? <p className="text-sm text-muted-foreground">{resultMessage}</p> : null}
         <div className="grid gap-4 md:grid-cols-2">

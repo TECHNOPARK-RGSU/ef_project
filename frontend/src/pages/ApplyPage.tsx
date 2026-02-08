@@ -10,6 +10,9 @@ import { formatDateRange } from "@/lib/format";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type {
   Comment,
+  Conference,
+  ConferenceStageAvailability,
+  ConferenceStatusFlowItem,
   ParticipationStage,
   PresentationType,
   Project,
@@ -36,6 +39,9 @@ export function ApplyPage() {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [conferences, setConferences] = useState<Conference[]>([]);
+  const [statusFlowItems, setStatusFlowItems] = useState<ConferenceStatusFlowItem[]>([]);
+  const [stageItems, setStageItems] = useState<ConferenceStageAvailability[]>([]);
   const [stages, setStages] = useState<ParticipationStage[]>([]);
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -49,14 +55,17 @@ export function ApplyPage() {
   const [projectsQuery, setProjectsQuery] = useState("");
   const [projectsSort, setProjectsSort] = useState<"updated_desc" | "title_asc">("updated_desc");
   const [projectsPage, setProjectsPage] = useState(1);
+  const [conferenceFilter, setConferenceFilter] = useState("all");
   const [adminSectionFilter, setAdminSectionFilter] = useState("all");
   const [adminStatusFilter, setAdminStatusFilter] = useState("all");
   const [adminStageFilter, setAdminStageFilter] = useState("all");
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [form, setForm] = useState({
+    conferenceId: "",
     title: "",
     description: "",
     additionalInfo: "",
@@ -77,12 +86,19 @@ export function ApplyPage() {
       const requests = [
         fetchList<ProjectStatus>("/api/conf/project-statuses/", controller.signal).then(setStatuses),
         fetchList<Section>("/api/conf/sections/", controller.signal).then(setSections),
+        fetchList<Conference>("/api/conf/conferences/", controller.signal).then(setConferences),
         fetchList<ParticipationStage>("/api/conf/participation-stages/", controller.signal).then(setStages),
         fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(
           setPresentationTypes,
         ),
+        fetchList<ConferenceStatusFlowItem>("/api/conf/conference-status-flow/", controller.signal).then(
+          setStatusFlowItems,
+        ),
+        fetchList<ConferenceStageAvailability>("/api/conf/conference-stages/", controller.signal).then(
+          setStageItems,
+        ),
         fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
-        fetchList<Project>("/api/conf/projects/", controller.signal).then(setProjects),
+        fetchList<Project>("/api/conf/projects/?include_archived=1", controller.signal).then(setProjects),
         fetchList<ProjectResult>("/api/conf/results/", controller.signal).then(setResults),
         fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
       ];
@@ -102,6 +118,35 @@ export function ApplyPage() {
       statuses.some(status => status.code.toLowerCase() === step.code),
     );
   }, [statuses]);
+  const statusFlowByConference = useMemo(() => {
+    const map: Record<string, { code: string; label: string; order: number }[]> = {};
+    statusFlowItems.forEach(item => {
+      const confId = item.conference?.id ? String(item.conference.id) : null;
+      const statusCode = item.status?.code?.toLowerCase();
+      if (!confId || !statusCode || !item.is_enabled) return;
+      if (!map[confId]) map[confId] = [];
+      map[confId].push({
+        code: statusCode,
+        label: item.status?.name ?? statusCode,
+        order: item.order ?? 0,
+      });
+    });
+    Object.keys(map).forEach(confId => {
+      map[confId] = map[confId].sort((a, b) => a.order - b.order);
+    });
+    return map;
+  }, [statusFlowItems]);
+  const stageAvailabilityByConference = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    stageItems.forEach(item => {
+      const confId = item.conference?.id ? String(item.conference.id) : null;
+      const stageId = item.stage?.id ? String(item.stage.id) : null;
+      if (!confId || !stageId || !item.is_enabled) return;
+      if (!map[confId]) map[confId] = [];
+      map[confId].push(stageId);
+    });
+    return map;
+  }, [stageItems]);
   const studentUsers = useMemo(
     () =>
       users.filter(user => {
@@ -114,6 +159,42 @@ export function ApplyPage() {
     () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "tutor"),
     [users],
   );
+  const availableSections = useMemo(() => {
+    if (!form.conferenceId) return [];
+    return sections.filter(section => String(section.conference?.id) === form.conferenceId);
+  }, [form.conferenceId, sections]);
+  const filterSections = useMemo(() => {
+    if (conferenceFilter === "all") return sections;
+    return sections.filter(section => String(section.conference?.id) === conferenceFilter);
+  }, [conferenceFilter, sections]);
+  const availableStagesForForm = useMemo(() => {
+    if (!form.conferenceId) return stages;
+    const allowed = stageAvailabilityByConference[form.conferenceId];
+    if (!allowed || !allowed.length) return stages;
+    return stages.filter(stage => allowed.includes(String(stage.id)));
+  }, [form.conferenceId, stageAvailabilityByConference, stages]);
+  const filterStages = useMemo(() => {
+    if (conferenceFilter === "all") return stages;
+    const allowed = stageAvailabilityByConference[conferenceFilter];
+    if (!allowed || !allowed.length) return stages;
+    return stages.filter(stage => allowed.includes(String(stage.id)));
+  }, [conferenceFilter, stageAvailabilityByConference, stages]);
+  const statusFlowForForm = useMemo(() => {
+    if (!form.conferenceId) return availableStatusFlow;
+    const flow = statusFlowByConference[form.conferenceId];
+    return flow && flow.length ? flow : availableStatusFlow;
+  }, [form.conferenceId, availableStatusFlow, statusFlowByConference]);
+  const availableStatusOptions = useMemo(() => {
+    const codes = new Set(statusFlowForForm.map(step => step.code));
+    return statuses.filter(status => codes.has(status.code.toLowerCase()));
+  }, [statusFlowForForm, statuses]);
+  const filterStatusOptions = useMemo(() => {
+    if (conferenceFilter === "all") return statuses;
+    const flow = statusFlowByConference[conferenceFilter];
+    if (!flow || !flow.length) return statuses;
+    const codes = new Set(flow.map(step => step.code));
+    return statuses.filter(status => codes.has(status.code.toLowerCase()));
+  }, [conferenceFilter, statusFlowByConference, statuses]);
   const currentStudentName = useMemo(() => {
     const currentStudent = studentUsers.find(user => user.id === authUser?.id);
     if (!currentStudent) return "Текущий пользователь";
@@ -131,6 +212,9 @@ export function ApplyPage() {
   const visibleProjects = useMemo(() => {
     const needle = projectsQuery.trim().toLowerCase();
     const filtered = projects.filter(project => {
+      if (archiveFilter === "active" && project.is_archived) return false;
+      if (archiveFilter === "archived" && !project.is_archived) return false;
+      if (conferenceFilter !== "all" && String(project.section?.conference?.id) !== conferenceFilter) return false;
       if (!needle) return true;
       return project.title.toLowerCase().includes(needle);
     });
@@ -152,6 +236,8 @@ export function ApplyPage() {
       return bTime - aTime;
     });
   }, [
+    archiveFilter,
+    conferenceFilter,
     adminSectionFilter,
     adminStageFilter,
     adminStatusFilter,
@@ -168,7 +254,11 @@ export function ApplyPage() {
   }, [projectsPage, visibleProjects]);
   useEffect(() => {
     setProjectsPage(1);
-  }, [projectsQuery, projectsSort, adminSectionFilter, adminStatusFilter, adminStageFilter]);
+  }, [projectsQuery, projectsSort, adminSectionFilter, adminStatusFilter, adminStageFilter, conferenceFilter, archiveFilter]);
+
+  useEffect(() => {
+    setAdminSectionFilter("all");
+  }, [conferenceFilter]);
   useEffect(() => {
     if (projectsPage > totalPages) setProjectsPage(totalPages);
   }, [projectsPage, totalPages]);
@@ -199,6 +289,7 @@ export function ApplyPage() {
   }, [results]);
 
   const canSubmit =
+    form.conferenceId &&
     form.title.trim() &&
     form.leaderId &&
     form.sectionId &&
@@ -272,6 +363,7 @@ export function ApplyPage() {
       setSubmitState("saved");
       setSubmitMessage(editingId ? "Проект обновлен." : "Проект сохранен.");
       setForm({
+        conferenceId: "",
         title: "",
         description: "",
         additionalInfo: "",
@@ -299,6 +391,7 @@ export function ApplyPage() {
   const startEdit = (project: Project) => {
     setEditingId(project.id);
     setForm({
+      conferenceId: project.section?.conference?.id ? String(project.section.conference.id) : "",
       title: project.title,
       description: project.description ?? "",
       additionalInfo: project.additional_info ?? "",
@@ -321,6 +414,7 @@ export function ApplyPage() {
   const cancelEdit = () => {
     setEditingId(null);
     setForm({
+      conferenceId: "",
       title: "",
       description: "",
       additionalInfo: "",
@@ -341,8 +435,10 @@ export function ApplyPage() {
   };
 
   const openCreateProject = () => {
+    if (isOrganizerRole) return;
     setEditingId(null);
     setForm({
+      conferenceId: "",
       title: "",
       description: "",
       additionalInfo: "",
@@ -363,33 +459,60 @@ export function ApplyPage() {
     setIsProjectModalOpen(true);
   };
 
-  const deleteProject = async (id: number) => {
+  const archiveProject = async (id: number) => {
     setSubmitMessage(null);
     try {
       const token = getAuthToken();
       if (!token) throw new Error("missing token");
       const response = await fetch(`${API_BASE_URL}/api/conf/projects/${id}/`, {
-        method: "DELETE",
-        headers: { Authorization: `Token ${token}` },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ is_archived: true }),
       });
-      if (!response.ok) throw new Error("delete failed");
-      setProjects(current => current.filter(item => item.id !== id));
+      if (!response.ok) throw new Error("archive failed");
+      const updated = (await response.json()) as Project;
+      setProjects(current => current.map(item => (item.id === id ? updated : item)));
       if (editingId === id) cancelEdit();
-      setSubmitMessage("Проект удалён.");
+      setSubmitMessage("Проект отправлен в архив.");
     } catch (error) {
-      setSubmitMessage("Не удалось удалить проект.");
+      setSubmitMessage("Не удалось архивировать проект.");
     }
   };
 
-  const getStatusIndex = (statusCode?: string | null) => {
-    if (!statusCode) return -1;
-    return availableStatusFlow.findIndex(item => item.code === statusCode.toLowerCase());
+  const restoreProject = async (id: number) => {
+    setSubmitMessage(null);
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error("missing token");
+      const response = await fetch(`${API_BASE_URL}/api/conf/projects/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ is_archived: false }),
+      });
+      if (!response.ok) throw new Error("restore failed");
+      const updated = (await response.json()) as Project;
+      setProjects(current => current.map(item => (item.id === id ? updated : item)));
+      setSubmitMessage("Проект восстановлен из архива.");
+    } catch (error) {
+      setSubmitMessage("Не удалось восстановить проект.");
+    }
   };
 
-  const getNextStatusCode = (statusCode?: string | null) => {
-    const currentIndex = getStatusIndex(statusCode);
-    if (currentIndex < 0 || currentIndex >= availableStatusFlow.length - 1) return null;
-    return availableStatusFlow[currentIndex + 1].code;
+  const getStatusFlowForConference = (conferenceId?: number | null) => {
+    if (!conferenceId) return availableStatusFlow;
+    const flow = statusFlowByConference[String(conferenceId)];
+    return flow && flow.length ? flow : availableStatusFlow;
+  };
+
+  const getStatusIndex = (statusCode: string | null | undefined, flow: { code: string }[]) => {
+    if (!statusCode) return -1;
+    return flow.findIndex(item => item.code === statusCode.toLowerCase());
+  };
+
+  const getNextStatusCode = (statusCode: string | null | undefined, flow: { code: string }[]) => {
+    const currentIndex = getStatusIndex(statusCode, flow);
+    if (currentIndex < 0 || currentIndex >= flow.length - 1) return null;
+    return flow[currentIndex + 1].code;
   };
 
   const updateProjectStatus = async (projectId: number, statusCode: string) => {
@@ -442,7 +565,7 @@ export function ApplyPage() {
   };
 
   return (
-    <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+    <section className="space-y-6">
       <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -452,12 +575,12 @@ export function ApplyPage() {
             {isOrganizerRole ? "Управление проектами" : "Мои проекты"}
           </h1>
         </div>
-        <Button onClick={openCreateProject}>Создать проект</Button>
+        {!isOrganizerRole ? <Button onClick={openCreateProject}>Создать проект</Button> : null}
       </div>
 
       {isProjectModalOpen ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-4xl border-border/70 bg-card/85">
+      <Card className="w-full max-w-4xl border-border/70 bg-card/95">
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <CardTitle className="text-2xl">
@@ -484,6 +607,38 @@ export function ApplyPage() {
                 onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Конференция</Label>
+              <Select
+                value={form.conferenceId || undefined}
+                onValueChange={value =>
+                  setForm(current => ({
+                    ...current,
+                    conferenceId: value,
+                    sectionId: "",
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите конференцию" />
+                </SelectTrigger>
+                <SelectContent>
+                  {conferences.length ? (
+                    conferences.map(conf => (
+                      <SelectItem key={conf.id} value={String(conf.id)}>
+                        {conf.title}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="0" disabled>
+                      Нет конференций
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Руководитель</Label>
               {isStudentRole ? (
@@ -580,18 +735,18 @@ export function ApplyPage() {
                 onValueChange={value => setForm(current => ({ ...current, sectionId: value }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите направление" />
+                  <SelectValue placeholder={form.conferenceId ? "Выберите направление" : "Сначала выберите конференцию"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {sections.length ? (
-                    sections.map(section => (
+                  {availableSections.length ? (
+                    availableSections.map(section => (
                       <SelectItem key={section.id} value={String(section.id)}>
                         {section.name}
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="0" disabled>
-                      Нет секций
+                      {form.conferenceId ? "Нет секций" : "Выберите конференцию"}
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -636,15 +791,15 @@ export function ApplyPage() {
                     <SelectValue placeholder="Статус проекта" />
                   </SelectTrigger>
                   <SelectContent>
-                    {statuses.length ? (
-                      statuses.map(status => (
+                  {availableStatusOptions.length ? (
+                    availableStatusOptions.map(status => (
                         <SelectItem key={status.id} value={String(status.id)}>
                           {status.name}
                         </SelectItem>
                       ))
                     ) : (
                       <SelectItem value="0" disabled>
-                        Нет статусов
+                      Нет статусов
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -660,15 +815,15 @@ export function ApplyPage() {
                     <SelectValue placeholder="Этап участия" />
                   </SelectTrigger>
                   <SelectContent>
-                    {stages.length ? (
-                      stages.map(stage => (
+                  {availableStagesForForm.length ? (
+                    availableStagesForForm.map(stage => (
                         <SelectItem key={stage.id} value={String(stage.id)}>
                           {stage.name}
                         </SelectItem>
                       ))
                     ) : (
                       <SelectItem value="0" disabled>
-                        Нет этапов
+                      Нет этапов
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -761,6 +916,31 @@ export function ApplyPage() {
               </Select>
             </div>
 
+            <div className="grid gap-2 md:grid-cols-3">
+              <Select value={conferenceFilter} onValueChange={setConferenceFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Конференция" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все конференции</SelectItem>
+                  {conferences.map(conf => (
+                    <SelectItem key={conf.id} value={String(conf.id)}>
+                      {conf.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={archiveFilter} onValueChange={value => setArchiveFilter(value as "active" | "archived")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Статус" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Активные</SelectItem>
+                  <SelectItem value="archived">Архив</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {isOrganizerRole ? (
               <>
                 <div className="grid gap-2 md:grid-cols-3">
@@ -770,7 +950,7 @@ export function ApplyPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все секции</SelectItem>
-                      {sections.map(section => (
+                      {filterSections.map(section => (
                         <SelectItem key={section.id} value={String(section.id)}>
                           {section.name}
                         </SelectItem>
@@ -783,7 +963,7 @@ export function ApplyPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все статусы</SelectItem>
-                      {statuses.map(status => (
+                      {filterStatusOptions.map(status => (
                         <SelectItem key={status.id} value={String(status.id)}>
                           {status.name}
                         </SelectItem>
@@ -796,7 +976,7 @@ export function ApplyPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все этапы</SelectItem>
-                      {stages.map(stage => (
+                      {filterStages.map(stage => (
                         <SelectItem key={stage.id} value={String(stage.id)}>
                           {stage.name}
                         </SelectItem>
@@ -807,8 +987,10 @@ export function ApplyPage() {
                 {paginatedProjects.length ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {paginatedProjects.map(project => {
-                      const currentIndex = getStatusIndex(project.status?.code);
-                      const nextStatusCode = getNextStatusCode(project.status?.code);
+                      const flow = getStatusFlowForConference(project.section?.conference?.id);
+                      const currentIndex = getStatusIndex(project.status?.code, flow);
+                      const nextStatusCode = getNextStatusCode(project.status?.code, flow);
+                      const reworkAvailable = flow.some(step => step.code === "rework");
                       const leaderName = project.leader
                         ? `${project.leader.last_name || ""} ${project.leader.first_name || ""}`.trim()
                         : "—";
@@ -820,7 +1002,7 @@ export function ApplyPage() {
                               <p className="text-xs text-muted-foreground">{project.section?.name || "Секция не указана"}</p>
                             </div>
                             <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-[0.2em]">
-                              {project.status?.name || "Без статуса"}
+                              {project.is_archived ? "Архив" : project.status?.name || "Без статуса"}
                             </span>
                           </div>
                           <div className="grid gap-2 text-sm text-muted-foreground">
@@ -829,7 +1011,7 @@ export function ApplyPage() {
                             <p>Руководитель: {leaderName}</p>
                           </div>
                           <div className="flex gap-1">
-                            {(availableStatusFlow.length ? availableStatusFlow : statusFlow).map((step, index) => (
+                            {(flow.length ? flow : statusFlow).map((step, index) => (
                               <span
                                 key={step.code}
                                 className={`h-1.5 w-6 rounded-full ${
@@ -839,20 +1021,30 @@ export function ApplyPage() {
                             ))}
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
-                              Редактировать
-                            </Button>
-                            {nextStatusCode ? (
-                              <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, nextStatusCode)}>
-                                Следующий статус
+                            {!project.is_archived ? (
+                              <>
+                                <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
+                                  Редактировать
+                                </Button>
+                                {nextStatusCode ? (
+                                  <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, nextStatusCode)}>
+                                    Следующий статус
+                                  </Button>
+                                ) : null}
+                                {reworkAvailable ? (
+                                  <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
+                                    Доработка
+                                  </Button>
+                                ) : null}
+                                <Button size="sm" variant="outline" onClick={() => archiveProject(project.id)}>
+                                  В архив
+                                </Button>
+                              </>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => restoreProject(project.id)}>
+                                Восстановить
                               </Button>
-                            ) : null}
-                            <Button size="sm" variant="outline" onClick={() => updateProjectStatus(project.id, "rework")}>
-                              Доработка
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => deleteProject(project.id)}>
-                              Удалить
-                            </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -900,7 +1092,7 @@ export function ApplyPage() {
                       <p className="text-xs text-muted-foreground">{project.section?.name || "Секция не указана"}</p>
                     </div>
                     <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-[0.2em]">
-                      {project.status?.name || "Без статуса"}
+                      {project.is_archived ? "Архив" : project.status?.name || "Без статуса"}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">Этап: {project.stage?.name || "—"}</p>
@@ -916,16 +1108,6 @@ export function ApplyPage() {
                       {commentsByProject[project.id].slice(0, 2).map(item => (
                         <p key={item.id} className="text-sm">
                           {item.text}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null}
-                  {resultsByProject[project.id]?.length ? (
-                    <div className="rounded-md border border-border/60 bg-card/60 p-2">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Результаты</p>
-                      {resultsByProject[project.id].slice(0, 1).map(item => (
-                        <p key={item.id}>
-                          Итог: {item.total_score} • Место: {item.rank}
                         </p>
                       ))}
                     </div>
@@ -948,13 +1130,26 @@ export function ApplyPage() {
                       </Button>
                     </div>
                   ) : null}
-                  <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
-                    Редактировать
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {!project.is_archived ? (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => startEdit(project)}>
+                          Редактировать
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => archiveProject(project.id)}>
+                          В архив
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => restoreProject(project.id)}>
+                        Восстановить
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
-              <p>Проектов пока нет.</p>
+              <p>{archiveFilter === "archived" ? "Архив пуст." : "Проектов пока нет."}</p>
             )}
             {!isOrganizerRole ? (
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-sm text-muted-foreground">
