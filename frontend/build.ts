@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import plugin from "bun-plugin-tailwind";
-import { existsSync } from "fs";
+import { existsSync, copyFileSync } from "fs";
 import { rm } from "fs/promises";
 import path from "path";
 
@@ -143,6 +143,13 @@ const outputTable = result.outputs.map(output => ({
   Type: output.kind,
   Size: formatFileSize(output.size),
 }));
+
+const logoSrc = path.join(process.cwd(), "src", "logo.svg");
+if (existsSync(logoSrc)) {
+  const logoDest = path.join(outdir, "logo.svg");
+  copyFileSync(logoSrc, logoDest);
+  console.log("📋 Copied src/logo.svg → dist/logo.svg (favicon)");
+}
 
 console.table(outputTable);
 const buildTime = (end - start).toFixed(2);
