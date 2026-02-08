@@ -2,20 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
-import { FEATURES, STEPS } from "@/lib/content";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
-import type { Conference, ProjectStatus, Role, Section } from "@/lib/types";
+import type { Conference, Section } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
@@ -37,8 +28,6 @@ export function HomePage() {
   const [metaState, setMetaState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [selectedConference, setSelectedConference] = useState<Conference | null>(null);
   const [registerMessage, setRegisterMessage] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
@@ -76,11 +65,7 @@ export function HomePage() {
     const controller = new AbortController();
     const loadMeta = async () => {
       setMetaState("loading");
-      const requests = [
-        fetchList<Section>("/api/conf/sections/", controller.signal).then(setSections),
-        fetchList<ProjectStatus>("/api/conf/project-statuses/", controller.signal).then(setStatuses),
-        fetchList<Role>("/api/users/roles/", controller.signal).then(setRoles),
-      ];
+      const requests = [fetchList<Section>("/api/conf/sections/", controller.signal).then(setSections)];
 
       const results = await Promise.allSettled(requests);
       if (controller.signal.aborted) return;
@@ -93,17 +78,6 @@ export function HomePage() {
 
   const visibleConferences = useMemo(() => conferences, [conferences]);
   const visibleTracks = useMemo(() => toTrackCards(sections), [sections]);
-  const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(item => item.name), [statuses]);
-  const visibleRoles = useMemo(
-    () =>
-      roles.map(role => {
-        const normalizedCode = normalizeRoleCode(role.code);
-        const label = normalizedCode === "student" ? "Ученик" : role.name;
-        return `${label} — ${normalizedCode}`;
-      }),
-    [roles],
-  );
-
   useEffect(() => {
     if (!selectedConference && visibleConferences.length) {
       setSelectedConference(visibleConferences[0]);
@@ -113,7 +87,6 @@ export function HomePage() {
   const stats = [
     { value: String(sections.length), label: "Секций" },
     { value: String(conferences.length), label: "Конференций" },
-    { value: String(statuses.length), label: "Статусов проекта" },
   ];
 
   const submitRegistration = async () => {
@@ -527,145 +500,6 @@ export function HomePage() {
               </CardContent>
             </Card>
           )}
-        </div>
-      </section>
-
-      <section className="mt-16 grid gap-6 md:grid-cols-[0.9fr_1.1fr]" id="process">
-        <Card className="border-border/70 bg-card/85 animate-rise">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-xl">Что контролируем</CardTitle>
-            <p className="text-sm text-muted-foreground">Структура понятна, роли разграничены.</p>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            {FEATURES.map(feature => (
-              <div key={feature.title} className="space-y-1 rounded-lg border border-border/60 bg-background/70 p-4">
-                <p className="text-base font-semibold text-foreground">{feature.title}</p>
-                <p>{feature.description}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          {STEPS.map((step, index) => (
-            <Card
-              key={step.title}
-              className="border-border/70 bg-card/80 animate-rise"
-              style={{ animationDelay: `${index * 150}ms` }}
-            >
-              <CardHeader className="flex flex-row items-center gap-4">
-                <div className="flex size-11 items-center justify-center rounded-full border border-border/60 bg-background/80 text-sm font-semibold">
-                  0{index + 1}
-                </div>
-                <div>
-                  <CardTitle className="text-lg">{step.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{step.text}</p>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-16 grid gap-6 md:grid-cols-[1.1fr_0.9fr]" id="submit">
-        <Card className="border-border/70 bg-card/85 animate-rise">
-          <CardHeader>
-            <CardTitle className="text-xl">Форма заявки (пример)</CardTitle>
-            <p className="text-sm text-muted-foreground">Поля и структура перед заполнением в рабочем разделе.</p>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="project">Название проекта</Label>
-                <Input id="project" placeholder="Например, Энергоэффективный кампус" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="leader">Руководитель</Label>
-                <Input id="leader" placeholder="Фамилия Имя" />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Секция</Label>
-                <Select>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Выберите направление" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="science">Научные исследования</SelectItem>
-                    <SelectItem value="engineering">Инженерные проекты</SelectItem>
-                    <SelectItem value="humanities">Гуманитарные практики</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Формат</Label>
-                <Select>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Очный или заочный" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="offline">Очный</SelectItem>
-                    <SelectItem value="online">Заочный</SelectItem>
-                    <SelectItem value="hybrid">Гибридный</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="desc">Краткое описание</Label>
-              <Textarea
-                id="desc"
-                placeholder="Опишите цель проекта и ожидаемый результат"
-                className="min-h-[120px]"
-              />
-            </div>
-            <Button className="w-full" asChild>
-              <Link href="/apply">Перейти к заявке</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="border-border/70 bg-card/80 animate-floaty">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Статусы проекта</CardTitle>
-              <span
-                className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                  metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
-                }`}
-              >
-                {metaState === "ready" ? "данные загружены" : "нет данных"}
-              </span>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {visibleStatuses.length ? (
-                visibleStatuses.map(status => (
-                  <div key={status} className="flex items-center justify-between">
-                    <span>{status}</span>
-                    <span className="h-2 w-12 rounded-full bg-primary/30" />
-                  </div>
-                ))
-              ) : (
-                <p>Статусов пока нет.</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 bg-card/80">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Роли</CardTitle>
-              <span
-                className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
-                  metaState === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
-                }`}
-              >
-                {metaState === "ready" ? "данные загружены" : "нет данных"}
-              </span>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {visibleRoles.length ? visibleRoles.map(role => <p key={role}>{role}</p>) : <p>Ролей пока нет.</p>}
-            </CardContent>
-          </Card>
         </div>
       </section>
 

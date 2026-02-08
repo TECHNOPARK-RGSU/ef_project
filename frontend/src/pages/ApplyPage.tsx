@@ -727,7 +727,7 @@ export function ApplyPage() {
                 state === "ready" ? "bg-primary/10 text-primary" : "bg-muted"
               }`}
             >
-              {state === "ready" ? "из API" : "демо"}
+              {state === "ready" ? "данные загружены" : "загрузка"}
             </span>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">

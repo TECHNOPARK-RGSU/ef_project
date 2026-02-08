@@ -3,16 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
-import { getAuthToken, setAuthToken, setAuthUserInfo } from "@/lib/auth";
+import { setAuthToken, setAuthUserInfo } from "@/lib/auth";
 import { useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tokenValue, setTokenValue] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const existingToken = getAuthToken();
 
   const loadMe = async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/api/users/me/`, {
@@ -58,19 +56,8 @@ export function LoginPage() {
     window.location.href = "/";
   };
 
-  const saveToken = async () => {
-    if (!tokenValue.trim()) {
-      setMessage("Введите токен.");
-      return;
-    }
-    const token = tokenValue.trim();
-    setAuthToken(token);
-    await loadMe(token);
-    window.location.href = "/";
-  };
-
   return (
-    <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+    <section className="mx-auto max-w-md">
       <Card className="border-border/70 bg-card/80">
         <CardHeader>
           <div className="mb-2 flex items-center gap-3">
@@ -92,38 +79,6 @@ export function LoginPage() {
           {message ? <p>{message}</p> : null}
         </CardContent>
       </Card>
-
-      <div className="space-y-4">
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader>
-            <CardTitle className="text-lg">Вставить токен вручную</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <Input
-              placeholder="Токен доступа"
-              value={tokenValue}
-              onChange={event => setTokenValue(event.target.value)}
-            />
-            <Button variant="outline" onClick={saveToken}>
-              Сохранить токен
-            </Button>
-            {existingToken ? (
-              <p className="text-xs">Токен уже сохранён. Можно сразу перейти в интерфейс.</p>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader>
-            <CardTitle className="text-lg">Подсказка для демо</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Организатор: organizer@example.com</p>
-            <p>Пароль: password123</p>
-            <p>Вход обязателен для доступа к разделам.</p>
-          </CardContent>
-        </Card>
-      </div>
     </section>
   );
 }
