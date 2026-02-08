@@ -87,15 +87,9 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
                 <Button variant="outline" onClick={handleLogout}>
                   Выйти
                 </Button>
-                {normalizedRole === "organizer" ? (
-                  <Button asChild>
-                    <Link href="/conferences">Новая конференция</Link>
-                  </Button>
-                ) : (
-                  <Button asChild>
-                    <Link href="/conferences">Конференции</Link>
-                  </Button>
-                )}
+                <Button asChild>
+                  <Link href="/conferences">Конференции</Link>
+                </Button>
               </>
             ) : (
               <div className="flex items-center gap-2">

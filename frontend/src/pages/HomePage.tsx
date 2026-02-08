@@ -60,7 +60,7 @@ export function HomePage() {
 
   return (
     <>
-      <section className="grid gap-10 md:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-10">
         <div className="space-y-6 animate-rise">
           <p className="inline-flex items-center gap-2 rounded-full bg-card px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground shadow-sm">
             projectaris
@@ -91,31 +91,6 @@ export function HomePage() {
           </div>
           <p className="text-xs text-muted-foreground">Статистика обновляется автоматически.</p>
         </div>
-
-        <Card className="relative overflow-hidden border-border/70 bg-card/95 shadow-lg animate-rise">
-          <div className="pointer-events-none absolute -right-20 -top-16 size-64 rounded-full bg-accent/30 blur-3xl opacity-70" />
-          <div className="pointer-events-none absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/15 blur-3xl opacity-70" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-background/10 to-background/40" />
-          <CardHeader className="space-y-1 relative z-10">
-            <CardTitle className="text-xl">Начать работу</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Зарегистрируйтесь или войдите, чтобы получить доступ к личному кабинету.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground relative z-10">
-            <div className="grid gap-2">
-              <Button className="w-full" variant="outline" asChild>
-                <Link href="/login">Войти</Link>
-              </Button>
-              <Button className="w-full" asChild>
-                <Link href="/register">Регистрация</Link>
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              После входа откроется раздел, доступный вашей роли.
-            </p>
-          </CardContent>
-        </Card>
       </section>
 
       <section className="mt-16 grid gap-4 md:grid-cols-3">
