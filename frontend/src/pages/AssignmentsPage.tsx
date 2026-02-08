@@ -584,8 +584,8 @@ export function AssignmentsPage() {
       </div>
 
       {scoreModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-lg border-border/70 bg-card/95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-lg border-border/70 bg-card shadow-xl">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-lg">Оценка: {scoreModal.projectTitle}</CardTitle>

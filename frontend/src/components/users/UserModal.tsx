@@ -108,8 +108,8 @@ export function UserModal({ open, roles, orgs, initialUser, onClose, onSaved }: 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-3xl border-border/60 bg-card/90 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <Card className="w-full max-w-3xl border-border/60 bg-card shadow-xl">
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
             <CardTitle className="text-lg">

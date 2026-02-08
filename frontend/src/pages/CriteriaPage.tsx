@@ -165,8 +165,8 @@ export function CriteriaPage() {
       </div>
 
       {isCriteriaModalOpen ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-4xl border-border/70 bg-card/80">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <Card className="w-full max-w-4xl border-border/70 bg-card shadow-xl">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">

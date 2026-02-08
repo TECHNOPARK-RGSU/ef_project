@@ -526,8 +526,8 @@ export function ApplyPage() {
       </div>
 
       {isProjectModalOpen ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-4xl border-border/70 bg-card/95">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <Card className="w-full max-w-4xl border-border/70 bg-card shadow-xl">
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <CardTitle className="text-2xl">

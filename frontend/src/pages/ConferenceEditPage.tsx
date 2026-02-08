@@ -625,8 +625,8 @@ export function ConferenceEditPage() {
       </Card>
 
       {isCriteriaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card/95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">{editingCriterionId ? "Изменить критерий" : "Новый критерий"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsCriteriaModalOpen(false)}>Закрыть</Button>
@@ -667,8 +667,8 @@ export function ConferenceEditPage() {
       )}
 
       {isSectionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card/95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">Добавить секцию</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsSectionModalOpen(false)}>Закрыть</Button>
@@ -698,8 +698,8 @@ export function ConferenceEditPage() {
       )}
 
       {isExpertModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card/95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">{editingExpertId ? "Настроить эксперта" : "Добавить эксперта"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsExpertModalOpen(false)}>Закрыть</Button>
@@ -748,8 +748,8 @@ export function ConferenceEditPage() {
       )}
 
       {catalogModalType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card/95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">
                 {catalogModalType === "age" && "Возрастная категория"}

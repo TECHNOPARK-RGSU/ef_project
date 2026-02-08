@@ -92,9 +92,14 @@ export function ConferenceDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(isOrganizer || isTutor || isStudent) && (
+          {isOrganizer && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/conferences/${id}/projects`}>Заявки</Link>
+            </Button>
+          )}
+          {(isTutor || isStudent) && (
+            <Button size="sm" asChild>
+              <Link href={`/conferences/${id}/projects`}>Подать заявку</Link>
             </Button>
           )}
           {isOrganizer && (
@@ -174,9 +179,16 @@ export function ConferenceDetailPage() {
               {resultsCount > 0 && ` · С результатами: ${resultsCount}`}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/conferences/${id}/projects`}>Перейти к заявкам</Link>
-              </Button>
+              {(isTutor || isStudent) && (
+                <Button size="sm" asChild>
+                  <Link href={`/conferences/${id}/projects`}>Подать заявку</Link>
+                </Button>
+              )}
+              {isOrganizer && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/conferences/${id}/projects`}>К списку заявок</Link>
+                </Button>
+              )}
               {isOrganizer && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/conferences/${id}/results`}>Страница результатов</Link>
