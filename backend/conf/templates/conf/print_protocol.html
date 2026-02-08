@@ -30,8 +30,7 @@
           <th>Очный</th>
           <th>Итог</th>
           <th>Место</th>
-          <th>Победитель</th>
-          <th>Призёр</th>
+          <th>Результат</th>
         </tr>
       </thead>
       <tbody>
@@ -43,12 +42,11 @@
             <td>{{ result.offline_score }}</td>
             <td>{{ result.total_score }}</td>
             <td>{{ result.rank }}</td>
-            <td>{% if result.is_winner %}Да{% else %}—{% endif %}</td>
-            <td>{% if result.is_prize %}Да{% else %}—{% endif %}</td>
+            <td>{% if result.is_winner %}Победитель{% elif result.is_prize %}Призёр{% else %}Участник{% endif %}</td>
           </tr>
         {% empty %}
           <tr>
-            <td colspan="8">Нет результатов для печати.</td>
+            <td colspan="7">Нет результатов для печати.</td>
           </tr>
         {% endfor %}
       </tbody>

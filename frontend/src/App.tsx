@@ -2,7 +2,6 @@ import { SiteLayout } from "@/components/site/Layout";
 import { ApplyPage } from "@/pages/ApplyPage";
 import { AssignmentsPage } from "@/pages/AssignmentsPage";
 import { CatalogsPage } from "@/pages/CatalogsPage";
-import { CommentsPage } from "@/pages/CommentsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
 import { HomePage } from "@/pages/HomePage";
@@ -95,7 +94,6 @@ export function App() {
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;
   const canAccessScores = isOrganizer || isExpert;
-  const canAccessComments = isOrganizer || isExpert || isTutor;
   const canAccessAdminCatalogs = isOrganizer;
 
   const isAllowedPath = (path: string) => {
@@ -149,7 +147,6 @@ export function App() {
           {canAccessConferences && canAccessApply ? <Route path="/conferences/:id/projects" component={ApplyPage} /> : null}
           {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
           {canAccessConferences && canAccessScores ? <Route path="/conferences/:id/scores" component={ScoresPage} /> : null}
-          {canAccessConferences && canAccessComments ? <Route path="/conferences/:id/comments" component={CommentsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/sections" component={SectionsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/roles" component={RolesPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/users" component={UsersPage} /> : null}

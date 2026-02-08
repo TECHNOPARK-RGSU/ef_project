@@ -220,8 +220,9 @@ class ConferenceViewSet(viewsets.ModelViewSet):
         response = HttpResponse(content_type="text/csv")
         filename = f"conference_{conference.id}_results.csv"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        response.write("section,project,online_score,offline_score,total_score,rank,is_winner,is_prize\n")
+        response.write("section,project,online_score,offline_score,total_score,rank,result\n")
         for result in results:
+            result_label = "Победитель" if result.is_winner else "Призёр" if result.is_prize else "Участник"
             response.write(
                 f"{result.section.name},"
                 f"{result.project.title},"
@@ -229,8 +230,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
                 f"{result.offline_score},"
                 f"{result.total_score},"
                 f"{result.rank},"
-                f"{int(result.is_winner)},"
-                f"{int(result.is_prize)}\n"
+                f'"{result_label}"\n'
             )
         return response
 
@@ -251,11 +251,11 @@ class ConferenceViewSet(viewsets.ModelViewSet):
                 "offline_score",
                 "total_score",
                 "rank",
-                "is_winner",
-                "is_prize",
+                "result",
             ]
         )
         for result in results:
+            result_label = "Победитель" if result.is_winner else "Призёр" if result.is_prize else "Участник"
             sheet.append(
                 [
                     result.section.name,
@@ -264,8 +264,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
                     float(result.offline_score),
                     float(result.total_score),
                     result.rank,
-                    int(result.is_winner),
-                    int(result.is_prize),
+                    result_label,
                 ]
             )
 

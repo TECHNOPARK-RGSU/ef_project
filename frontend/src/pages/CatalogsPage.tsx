@@ -13,7 +13,39 @@ import type {
   PresentationType,
   ProjectStatus,
 } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const CATALOG_PER_PAGE = 8;
+
+function PaginationControls({
+  page,
+  totalPages,
+  total,
+  perPage,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  perPage: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (total <= perPage) return null;
+  const from = (page - 1) * perPage + 1;
+  const to = Math.min(page * perPage, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+      <span>Показано {from}–{to} из {total}</span>
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="outline" className="h-7" disabled={page <= 1} onClick={onPrev}>←</Button>
+        <span>{page} / {totalPages}</span>
+        <Button size="sm" variant="outline" className="h-7" disabled={page >= totalPages} onClick={onNext}>→</Button>
+      </div>
+    </div>
+  );
+}
 
 export function CatalogsPage() {
   const [categories, setCategories] = useState<AgeCategory[]>([]);
@@ -22,6 +54,13 @@ export function CatalogsPage() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
   const [organizations, setOrganizations] = useState<EducationalOrganization[]>([]);
+
+  const [categoryPage, setCategoryPage] = useState(1);
+  const [statusPage, setStatusPage] = useState(1);
+  const [stagePage, setStagePage] = useState(1);
+  const [placePage, setPlacePage] = useState(1);
+  const [presentationPage, setPresentationPage] = useState(1);
+  const [orgPage, setOrgPage] = useState(1);
 
   const [categoryForm, setCategoryForm] = useState({ name: "", minAge: "", maxAge: "" });
   const [categoryEditingId, setCategoryEditingId] = useState<number | null>(null);
@@ -52,6 +91,37 @@ export function CatalogsPage() {
   });
   const [orgEditingId, setOrgEditingId] = useState<number | null>(null);
   const [orgMessage, setOrgMessage] = useState<string | null>(null);
+
+  const categoryTotalPages = Math.max(1, Math.ceil(categories.length / CATALOG_PER_PAGE));
+  const paginatedCategories = useMemo(() => {
+    const start = (categoryPage - 1) * CATALOG_PER_PAGE;
+    return categories.slice(start, start + CATALOG_PER_PAGE);
+  }, [categories, categoryPage]);
+  const statusTotalPages = Math.max(1, Math.ceil(statuses.length / CATALOG_PER_PAGE));
+  const paginatedStatuses = useMemo(() => {
+    const start = (statusPage - 1) * CATALOG_PER_PAGE;
+    return statuses.slice(start, start + CATALOG_PER_PAGE);
+  }, [statuses, statusPage]);
+  const stageTotalPages = Math.max(1, Math.ceil(stages.length / CATALOG_PER_PAGE));
+  const paginatedStages = useMemo(() => {
+    const start = (stagePage - 1) * CATALOG_PER_PAGE;
+    return stages.slice(start, start + CATALOG_PER_PAGE);
+  }, [stages, stagePage]);
+  const placeTotalPages = Math.max(1, Math.ceil(places.length / CATALOG_PER_PAGE));
+  const paginatedPlaces = useMemo(() => {
+    const start = (placePage - 1) * CATALOG_PER_PAGE;
+    return places.slice(start, start + CATALOG_PER_PAGE);
+  }, [places, placePage]);
+  const presentationTotalPages = Math.max(1, Math.ceil(presentationTypes.length / CATALOG_PER_PAGE));
+  const paginatedPresentationTypes = useMemo(() => {
+    const start = (presentationPage - 1) * CATALOG_PER_PAGE;
+    return presentationTypes.slice(start, start + CATALOG_PER_PAGE);
+  }, [presentationTypes, presentationPage]);
+  const orgTotalPages = Math.max(1, Math.ceil(organizations.length / CATALOG_PER_PAGE));
+  const paginatedOrgs = useMemo(() => {
+    const start = (orgPage - 1) * CATALOG_PER_PAGE;
+    return organizations.slice(start, start + CATALOG_PER_PAGE);
+  }, [organizations, orgPage]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -530,8 +600,8 @@ export function CatalogsPage() {
             {categoryMessage ? <p>{categoryMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {categories.length ? (
-              categories.map(item => (
+            {paginatedCategories.length ? (
+              paginatedCategories.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.name}</p>
                   <p>
@@ -550,6 +620,7 @@ export function CatalogsPage() {
             ) : (
               <p>Категорий пока нет.</p>
             )}
+            <PaginationControls page={categoryPage} totalPages={categoryTotalPages} total={categories.length} perPage={CATALOG_PER_PAGE} onPrev={() => setCategoryPage(p => Math.max(1, p - 1))} onNext={() => setCategoryPage(p => Math.min(categoryTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>
@@ -582,8 +653,8 @@ export function CatalogsPage() {
             {statusMessage ? <p>{statusMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {statuses.length ? (
-              statuses.map(item => (
+            {paginatedStatuses.length ? (
+              paginatedStatuses.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.name}</p>
                   <p>{item.code}</p>
@@ -600,6 +671,7 @@ export function CatalogsPage() {
             ) : (
               <p>Статусов пока нет.</p>
             )}
+            <PaginationControls page={statusPage} totalPages={statusTotalPages} total={statuses.length} perPage={CATALOG_PER_PAGE} onPrev={() => setStatusPage(p => Math.max(1, p - 1))} onNext={() => setStatusPage(p => Math.min(statusTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>
@@ -632,8 +704,8 @@ export function CatalogsPage() {
             {stageMessage ? <p>{stageMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {stages.length ? (
-              stages.map(item => (
+            {paginatedStages.length ? (
+              paginatedStages.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.name}</p>
                   <p>{item.code}</p>
@@ -650,6 +722,7 @@ export function CatalogsPage() {
             ) : (
               <p>Этапов пока нет.</p>
             )}
+            <PaginationControls page={stagePage} totalPages={stageTotalPages} total={stages.length} perPage={CATALOG_PER_PAGE} onPrev={() => setStagePage(p => Math.max(1, p - 1))} onNext={() => setStagePage(p => Math.min(stageTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>
@@ -682,8 +755,8 @@ export function CatalogsPage() {
             {placeMessage ? <p>{placeMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {places.length ? (
-              places.map(item => (
+            {paginatedPlaces.length ? (
+              paginatedPlaces.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.name}</p>
                   <p>{item.address || "Адрес не указан"}</p>
@@ -700,6 +773,7 @@ export function CatalogsPage() {
             ) : (
               <p>Мест пока нет.</p>
             )}
+            <PaginationControls page={placePage} totalPages={placeTotalPages} total={places.length} perPage={CATALOG_PER_PAGE} onPrev={() => setPlacePage(p => Math.max(1, p - 1))} onNext={() => setPlacePage(p => Math.min(placeTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>
@@ -756,8 +830,8 @@ export function CatalogsPage() {
             {presentationMessage ? <p>{presentationMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {presentationTypes.length ? (
-              presentationTypes.map(item => (
+            {paginatedPresentationTypes.length ? (
+              paginatedPresentationTypes.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.name}</p>
                   <p>{item.code}</p>
@@ -775,6 +849,7 @@ export function CatalogsPage() {
             ) : (
               <p>Типов пока нет.</p>
             )}
+            <PaginationControls page={presentationPage} totalPages={presentationTotalPages} total={presentationTypes.length} perPage={CATALOG_PER_PAGE} onPrev={() => setPresentationPage(p => Math.max(1, p - 1))} onNext={() => setPresentationPage(p => Math.min(presentationTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>
@@ -824,8 +899,8 @@ export function CatalogsPage() {
             {orgMessage ? <p>{orgMessage}</p> : null}
           </div>
           <div className="space-y-2">
-            {organizations.length ? (
-              organizations.map(item => (
+            {paginatedOrgs.length ? (
+              paginatedOrgs.map(item => (
                 <div key={item.id} className="rounded-lg border border-border/60 bg-background/70 p-3">
                   <p className="font-semibold text-foreground">{item.short_name || item.name}</p>
                   <p>{item.city || "Город не указан"}</p>
@@ -843,6 +918,7 @@ export function CatalogsPage() {
             ) : (
               <p>Организаций пока нет.</p>
             )}
+            <PaginationControls page={orgPage} totalPages={orgTotalPages} total={organizations.length} perPage={CATALOG_PER_PAGE} onPrev={() => setOrgPage(p => Math.max(1, p - 1))} onNext={() => setOrgPage(p => Math.min(orgTotalPages, p + 1))} />
           </div>
         </CardContent>
       </Card>

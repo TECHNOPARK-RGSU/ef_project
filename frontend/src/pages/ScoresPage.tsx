@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
-import type { EvaluationCriterion, Project, ProjectScore, User } from "@/lib/types";
+import type { Comment, EvaluationCriterion, Project, ProjectScore, User } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 
@@ -15,10 +15,12 @@ export function ScoresPage() {
   const authUser = getAuthUserInfo();
   const roleCode = (authUser?.roleCode ?? "").toLowerCase();
   const isOrganizerRole = roleCode === "organizer";
+  const isExpertRole = roleCode === "expert";
   const [criteria, setCriteria] = useState<EvaluationCriterion[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [scores, setScores] = useState<ProjectScore[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
@@ -27,6 +29,10 @@ export function ScoresPage() {
   useEffect(() => {
     if (conferenceIdFromRoute != null) setConferenceFilter(String(conferenceIdFromRoute));
   }, [conferenceIdFromRoute]);
+  const authUserId = authUser?.id;
+  useEffect(() => {
+    if (roleCode === "expert" && authUserId) setEvaluatorFilter(String(authUserId));
+  }, [authUserId, roleCode]);
   const [sectionFilter, setSectionFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [evaluatorFilter, setEvaluatorFilter] = useState("all");
@@ -85,6 +91,17 @@ export function ScoresPage() {
       return score.project.title.toLowerCase().includes(needle);
     });
   }, [conferenceFilter, evaluatorFilter, query, scores, sectionFilter, stageFilter]);
+  const myComments = useMemo(
+    () => (authUser?.id ? comments.filter(c => c.author?.id === authUser.id) : []),
+    [authUser?.id, comments],
+  );
+  const [commentsPage, setCommentsPage] = useState(1);
+  const COMMENTS_PER_PAGE = 10;
+  const commentsTotalPages = Math.max(1, Math.ceil(myComments.length / COMMENTS_PER_PAGE));
+  const paginatedMyComments = useMemo(() => {
+    const start = (commentsPage - 1) * COMMENTS_PER_PAGE;
+    return myComments.slice(start, start + COMMENTS_PER_PAGE);
+  }, [myComments, commentsPage]);
   const perPage = 8;
   const totalPages = Math.max(1, Math.ceil(filteredScores.length / perPage));
   const paginatedScores = useMemo(() => {
@@ -98,20 +115,25 @@ export function ScoresPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.allSettled([
+    const promises: Promise<unknown>[] = [
       fetchList<EvaluationCriterion>("/api/conf/criteria/", controller.signal),
       fetchList<Project>("/api/conf/projects/", controller.signal),
       fetchList<User>("/api/users/users/", controller.signal),
       fetchList<ProjectScore>("/api/conf/scores/", controller.signal),
-    ]).then(results => {
+    ];
+    if (isExpertRole) {
+      promises.push(fetchList<Comment>("/api/conf/comments/", controller.signal));
+    }
+    Promise.allSettled(promises).then(results => {
       if (controller.signal.aborted) return;
-      if (results[0].status === "fulfilled") setCriteria(results[0].value);
-      if (results[1].status === "fulfilled") setProjects(results[1].value);
-      if (results[2].status === "fulfilled") setUsers(results[2].value);
-      if (results[3].status === "fulfilled") setScores(results[3].value);
+      if (results[0].status === "fulfilled") setCriteria(results[0].value as EvaluationCriterion[]);
+      if (results[1].status === "fulfilled") setProjects(results[1].value as Project[]);
+      if (results[2].status === "fulfilled") setUsers(results[2].value as User[]);
+      if (results[3].status === "fulfilled") setScores(results[3].value as ProjectScore[]);
+      if (results[4]?.status === "fulfilled") setComments((results[4] as PromiseFulfilledResult<Comment[]>).value);
     });
     return () => controller.abort();
-  }, []);
+  }, [isExpertRole]);
 
   const submitScore = async () => {
     setMessage(null);
@@ -399,36 +421,51 @@ export function ScoresPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <Card className="border-border/70 bg-card/80">
         {paginatedScores.length ? (
-          paginatedScores.map(score => (
-            <Card key={score.id} className="border-border/70 bg-card/80">
-              <CardHeader>
-                <CardTitle className="text-lg">{score.project.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-1">
-                <p>Критерий: {score.criterion.name}</p>
-                <p>Этап: {score.criterion.stage === "online" ? "заочный" : "очный"}</p>
-                <p>Секция: {score.project.section?.name || "—"}</p>
-                <p>Оценщик: {score.evaluator ? `${score.evaluator.last_name} ${score.evaluator.first_name}` : "—"}</p>
-                <p>Баллы: {score.score}</p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <Button size="sm" variant="secondary" onClick={() => startEdit(score)}>
-                    Редактировать
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteScore(score.id)}>
-                    Удалить
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+                  <th className="py-2 pr-2">Проект</th>
+                  <th className="py-2 pr-2">Критерий</th>
+                  <th className="py-2 pr-2">Баллы</th>
+                  <th className="py-2 pr-2">Этап</th>
+                  <th className="py-2 pr-2">Секция</th>
+                  {isOrganizerRole ? <th className="py-2 pr-2">Оценщик</th> : null}
+                  <th className="py-2 pr-2">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedScores.map(score => (
+                  <tr key={score.id} className="border-b border-border/40">
+                    <td className="py-2 pr-2 font-medium">{score.project.title}</td>
+                    <td className="py-2 pr-2 text-muted-foreground">{score.criterion.name}</td>
+                    <td className="py-2 pr-2">{score.score}</td>
+                    <td className="py-2 pr-2 text-muted-foreground">{score.criterion.stage === "online" ? "заочный" : "очный"}</td>
+                    <td className="py-2 pr-2 text-muted-foreground">{score.project.section?.name || "—"}</td>
+                    {isOrganizerRole ? (
+                      <td className="py-2 pr-2 text-muted-foreground">
+                        {score.evaluator ? `${score.evaluator.last_name} ${score.evaluator.first_name}` : "—"}
+                      </td>
+                    ) : null}
+                    <td className="py-2 pr-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => startEdit(score)}>Изм.</Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => deleteScore(score.id)}>Удал.</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          </CardContent>
         ) : (
-          <Card className="border-border/70 bg-card/80">
-            <CardContent className="p-6 text-sm text-muted-foreground">Оценок пока нет.</CardContent>
-          </Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">Оценок пока нет.</CardContent>
         )}
-      </div>
+      </Card>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           Показано {paginatedScores.length} из {filteredScores.length}
@@ -450,6 +487,55 @@ export function ScoresPage() {
           </Button>
         </div>
       </div>
+
+      {isExpertRole ? (
+        <Card className="border-border/70 bg-card/80 mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Мои оценки и комментарии</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Ниже — ваши выставленные оценки и оставленные комментарии по проектам.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {myComments.length > 0 ? (
+              <>
+                <p className="text-sm font-medium text-muted-foreground">Мои комментарии</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+                        <th className="py-1.5 pr-2">Проект</th>
+                        <th className="py-1.5">Текст</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedMyComments.map(c => (
+                        <tr key={c.id} className="border-b border-border/40">
+                          <td className="py-1.5 pr-2 font-medium">{c.project?.title ?? "—"}</td>
+                          <td className="py-1.5 text-muted-foreground max-w-xs truncate">{c.text}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {myComments.length > COMMENTS_PER_PAGE ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>Показано {paginatedMyComments.length} из {myComments.length}</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="h-7" disabled={commentsPage <= 1} onClick={() => setCommentsPage(p => Math.max(1, p - 1))}>←</Button>
+                      <span>{commentsPage} / {commentsTotalPages}</span>
+                      <Button size="sm" variant="outline" className="h-7" disabled={commentsPage >= commentsTotalPages} onClick={() => setCommentsPage(p => Math.min(commentsTotalPages, p + 1))}>→</Button>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Оценки отображаются в таблице выше (отфильтруйте по оценщику при необходимости).
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

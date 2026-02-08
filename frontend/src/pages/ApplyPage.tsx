@@ -49,6 +49,7 @@ export function ApplyPage() {
   const [projectsQuery, setProjectsQuery] = useState("");
   const [projectsSort, setProjectsSort] = useState<"updated_desc" | "title_asc">("updated_desc");
   const [projectsPage, setProjectsPage] = useState(1);
+  const [resultsPage, setResultsPage] = useState(1);
   const [conferenceFilter, setConferenceFilter] = useState("all");
   useEffect(() => {
     if (conferenceIdFromRoute != null) setConferenceFilter(String(conferenceIdFromRoute));
@@ -242,6 +243,12 @@ export function ApplyPage() {
       return acc;
     }, {});
   }, [results]);
+  const RESULTS_LIST_PER_PAGE = 6;
+  const resultsListTotalPages = Math.max(1, Math.ceil(results.length / RESULTS_LIST_PER_PAGE));
+  const paginatedResultsList = useMemo(() => {
+    const start = (resultsPage - 1) * RESULTS_LIST_PER_PAGE;
+    return results.slice(start, start + RESULTS_LIST_PER_PAGE);
+  }, [results, resultsPage]);
 
   const canSubmit =
     form.conferenceId &&
@@ -980,6 +987,21 @@ export function ApplyPage() {
                               </Select>
                             </div>
                           ) : null}
+                          {resultsByProject[project.id]?.[0] ? (
+                            <p className="text-xs text-muted-foreground">
+                              Итог: {resultsByProject[project.id][0].total_score} баллов, место {resultsByProject[project.id][0].rank}
+                            </p>
+                          ) : null}
+                          {commentsByProject[project.id]?.length ? (
+                            <div className="rounded-md border border-border/60 bg-muted/30 p-2 space-y-1">
+                              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Комментарии</p>
+                              {commentsByProject[project.id].map(c => (
+                                <p key={c.id} className="text-xs">
+                                  {c.author ? `${c.author.last_name ?? ""} ${c.author.first_name ?? ""}: ` : ""}{c.text}
+                                </p>
+                              ))}
+                            </div>
+                          ) : null}
                           <div className="flex flex-wrap gap-2">
                             {!project.is_archived ? (
                               <>
@@ -1052,12 +1074,17 @@ export function ApplyPage() {
                       {formatDateRange(project.section.conference.start_date, project.section.conference.end_date)}
                     </p>
                   ) : null}
+                  {resultsByProject[project.id]?.[0] ? (
+                    <p className="text-xs text-muted-foreground">
+                      Итог: {resultsByProject[project.id][0].total_score} баллов, место {resultsByProject[project.id][0].rank}
+                    </p>
+                  ) : null}
                   {commentsByProject[project.id]?.length ? (
                     <div className="rounded-md border border-border/60 bg-card/60 p-2">
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Комментарии</p>
-                      {commentsByProject[project.id].slice(0, 2).map(item => (
+                      {commentsByProject[project.id].map(item => (
                         <p key={item.id} className="text-sm">
-                          {item.text}
+                          {item.author ? `${item.author.last_name ?? ""} ${item.author.first_name ?? ""}: ` : ""}{item.text}
                         </p>
                       ))}
                     </div>
@@ -1175,8 +1202,8 @@ export function ApplyPage() {
                 <CardTitle className="text-lg">Результаты</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                {results.length ? (
-                  results.slice(0, 5).map(item => (
+                {paginatedResultsList.length ? (
+                  paginatedResultsList.map(item => (
                     <p key={item.id}>
                       {item.project.title}: {item.total_score} баллов, место {item.rank}
                     </p>
@@ -1184,6 +1211,16 @@ export function ApplyPage() {
                 ) : (
                   <p>Результатов пока нет.</p>
                 )}
+                {results.length > RESULTS_LIST_PER_PAGE ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+                    <span>Показано {paginatedResultsList.length} из {results.length}</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="h-7" disabled={resultsPage <= 1} onClick={() => setResultsPage(p => Math.max(1, p - 1))}>←</Button>
+                      <span>{resultsPage} / {resultsListTotalPages}</span>
+                      <Button size="sm" variant="outline" className="h-7" disabled={resultsPage >= resultsListTotalPages} onClick={() => setResultsPage(p => Math.min(resultsListTotalPages, p + 1))}>→</Button>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </>

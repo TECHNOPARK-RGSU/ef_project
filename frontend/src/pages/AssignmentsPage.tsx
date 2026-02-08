@@ -28,7 +28,8 @@ export function AssignmentsPage() {
   }, [conferenceIdFromRoute]);
   const [stageFilter, setStageFilter] = useState("all");
   const [assignmentsPage, setAssignmentsPage] = useState(1);
-  const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
+  const [assignmentItemsPage, setAssignmentItemsPage] = useState<Record<number, number>>({});
+  const ASSIGNMENT_ITEMS_PER_PAGE = 10;
   const [form, setForm] = useState({
     conferenceId: "",
     stage: "online",
@@ -57,16 +58,18 @@ export function AssignmentsPage() {
     return () => controller.abort();
   }, []);
 
+  const isExpertRole = roleCode === "expert";
   const filteredAssignments = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return assignments.filter(item => {
+      if (!isOrganizerRole && authUser?.id != null && item.expert?.id !== authUser.id) return false;
       if (conferenceFilter !== "all" && String(item.conference.id) !== conferenceFilter) return false;
       if (stageFilter !== "all" && item.stage !== stageFilter) return false;
       if (!needle) return true;
       const expertName = `${item.expert.last_name ?? ""} ${item.expert.first_name ?? ""}`.toLowerCase();
       return expertName.includes(needle) || item.conference.title.toLowerCase().includes(needle);
     });
-  }, [assignments, conferenceFilter, query, stageFilter]);
+  }, [assignments, conferenceFilter, query, stageFilter, isOrganizerRole, authUser?.id]);
   const perPage = 6;
   const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / perPage));
   const paginatedAssignments = useMemo(() => {
@@ -259,59 +262,94 @@ export function AssignmentsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-4">
         {paginatedAssignments.length ? (
-          paginatedAssignments.map(assignment => (
-            <Card key={assignment.id} className="border-border/70 bg-card/80">
-              <CardHeader className="space-y-2">
-                <CardTitle className="text-lg">
-                  {assignment.expert.last_name} {assignment.expert.first_name}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">{assignment.conference.title}</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  {assignment.stage === "online" ? "заочный этап" : "очный этап"}
-                </p>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-3">
-                <p>Назначено: {assignment.items?.length ?? 0}</p>
-                <Button size="sm" variant="secondary" onClick={() => downloadZip(assignment.id)}>
-                  Скачать ZIP
-                </Button>
-                <div className="space-y-2">
-                  {assignment.items?.length ? (
-                    (expandedAssignments[assignment.id] ? assignment.items : assignment.items.slice(0, 5)).map(item => (
-                      <div key={item.id} className="rounded-md border border-border/60 bg-background/70 p-2">
-                        <p className="font-semibold text-foreground">{item.project.title}</p>
-                        <p>Секция: {item.project.section?.name || "не указана"}</p>
-                        {assignment.stage === "offline" ? (
-                          <p>
-                            Аудитория: {item.place?.name || "не указана"}{" "}
-                            {item.place?.address ? `(${item.place.address})` : ""}
-                          </p>
-                        ) : null}
+          paginatedAssignments.map(assignment => {
+            const items = assignment.items ?? [];
+            const itemPage = assignmentItemsPage[assignment.id] ?? 1;
+            const itemTotalPages = Math.max(1, Math.ceil(items.length / ASSIGNMENT_ITEMS_PER_PAGE));
+            const start = (itemPage - 1) * ASSIGNMENT_ITEMS_PER_PAGE;
+            const paginatedItems = items.slice(start, start + ASSIGNMENT_ITEMS_PER_PAGE);
+            return (
+              <Card key={assignment.id} className="border-border/70 bg-card/80">
+                <CardHeader className="py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">
+                        {assignment.expert.last_name} {assignment.expert.first_name}
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {assignment.conference.title} · {assignment.stage === "online" ? "заочный" : "очный"} · {items.length} работ
+                      </p>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => downloadZip(assignment.id)}>
+                      ZIP
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-0">
+                  {items.length ? (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+                              <th className="py-1.5 pr-2">№</th>
+                              <th className="py-1.5 pr-2">Проект</th>
+                              <th className="py-1.5 pr-2">Секция</th>
+                              {assignment.stage === "offline" ? <th className="py-1.5">Аудитория</th> : null}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedItems.map((item, idx) => (
+                              <tr key={item.id} className="border-b border-border/40">
+                                <td className="py-1.5 pr-2 text-muted-foreground">{start + idx + 1}</td>
+                                <td className="py-1.5 pr-2 font-medium">{item.project.title}</td>
+                                <td className="py-1.5 pr-2 text-muted-foreground">{item.project.section?.name || "—"}</td>
+                                {assignment.stage === "offline" ? (
+                                  <td className="py-1.5 text-muted-foreground">{item.place?.name || "—"}</td>
+                                ) : null}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    ))
+                      {items.length > ASSIGNMENT_ITEMS_PER_PAGE ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-muted-foreground">
+                          <span>
+                            Показано {start + 1}–{start + paginatedItems.length} из {items.length}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2"
+                              disabled={itemPage <= 1}
+                              onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.max(1, itemPage - 1) }))}
+                            >
+                              ←
+                            </Button>
+                            <span>{itemPage} / {itemTotalPages}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2"
+                              disabled={itemPage >= itemTotalPages}
+                              onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.min(itemTotalPages, itemPage + 1) }))}
+                            >
+                              →
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
                   ) : (
-                    <p>Работ пока нет.</p>
+                    <p className="py-2 text-sm text-muted-foreground">Работ пока нет.</p>
                   )}
-                </div>
-                {assignment.items && assignment.items.length > 5 ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      setExpandedAssignments(current => ({
-                        ...current,
-                        [assignment.id]: !current[assignment.id],
-                      }))
-                    }
-                  >
-                    {expandedAssignments[assignment.id] ? "Свернуть" : "Показать все"}
-                  </Button>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         ) : (
           <Card className="border-border/70 bg-card/80">
             <CardContent className="p-6 text-sm text-muted-foreground">Назначений пока нет.</CardContent>

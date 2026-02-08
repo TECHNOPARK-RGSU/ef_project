@@ -52,6 +52,10 @@ export function ConferenceDetailPage() {
   const [editingCriterionId, setEditingCriterionId] = useState<number | null>(null);
   const [isCriteriaModalOpen, setIsCriteriaModalOpen] = useState(false);
   const [criteriaPage, setCriteriaPage] = useState(1);
+  const [resultsPreviewPage, setResultsPreviewPage] = useState(1);
+  const [sectionsPage, setSectionsPage] = useState(1);
+  const [expertsPage, setExpertsPage] = useState(1);
+  const [resultsPage, setResultsPage] = useState(1);
 
   useEffect(() => {
     if (!id) return;
@@ -103,27 +107,50 @@ export function ConferenceDetailPage() {
   }, [id, isOrganizerRole]);
 
   const visibleConference = conference || null;
-  const visibleSections = useMemo(() => {
-    if (!sections.length) return [];
-    return sections
-      .filter(section => section.conference?.id === id)
-      .slice(0, 6)
-      .map(section => ({
-        name: section.name,
-        age: section.category?.name ?? "Категория не указана",
-        format: section.conference?.title ?? "Конференция не указана",
-      }));
-  }, [sections, id]);
   const conferenceSections = useMemo(() => {
     if (!sections.length) return [];
     return sections.filter(section => section.conference?.id === id);
   }, [sections, id]);
-  const CRITERIA_PER_PAGE = 8;
+  const sectionsForDisplay = useMemo(
+    () =>
+      conferenceSections.map(section => ({
+        id: section.id,
+        name: section.name,
+        age: section.category?.name ?? "Категория не указана",
+        format: section.conference?.title ?? "Конференция не указана",
+      })),
+    [conferenceSections],
+  );
+  const CRITERIA_PER_PAGE = 6;
+  const RESULTS_PREVIEW_PER_PAGE = 4;
+  const SECTIONS_PER_PAGE = 6;
+  const EXPERTS_PER_PAGE = 5;
+  const RESULTS_PER_PAGE = 8;
   const criteriaTotalPages = Math.max(1, Math.ceil(criteria.length / CRITERIA_PER_PAGE));
   const paginatedCriteria = useMemo(() => {
     const start = (criteriaPage - 1) * CRITERIA_PER_PAGE;
     return criteria.slice(start, start + CRITERIA_PER_PAGE);
   }, [criteria, criteriaPage]);
+  const resultsPreviewTotalPages = Math.max(1, Math.ceil(results.length / RESULTS_PREVIEW_PER_PAGE));
+  const paginatedResultsPreview = useMemo(() => {
+    const start = (resultsPreviewPage - 1) * RESULTS_PREVIEW_PER_PAGE;
+    return results.slice(start, start + RESULTS_PREVIEW_PER_PAGE);
+  }, [results, resultsPreviewPage]);
+  const sectionsTotalPages = Math.max(1, Math.ceil(sectionsForDisplay.length / SECTIONS_PER_PAGE));
+  const paginatedSectionsForDisplay = useMemo(() => {
+    const start = (sectionsPage - 1) * SECTIONS_PER_PAGE;
+    return sectionsForDisplay.slice(start, start + SECTIONS_PER_PAGE);
+  }, [sectionsForDisplay, sectionsPage]);
+  const expertsTotalPages = Math.max(1, Math.ceil(conferenceExperts.length / EXPERTS_PER_PAGE));
+  const paginatedExperts = useMemo(() => {
+    const start = (expertsPage - 1) * EXPERTS_PER_PAGE;
+    return conferenceExperts.slice(start, start + EXPERTS_PER_PAGE);
+  }, [conferenceExperts, expertsPage]);
+  const resultsTotalPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
+  const paginatedResultsBottom = useMemo(() => {
+    const start = (resultsPage - 1) * RESULTS_PER_PAGE;
+    return results.slice(start, start + RESULTS_PER_PAGE);
+  }, [results, resultsPage]);
   const availableExperts = useMemo(() => {
     return expertUsers.filter(user => (user.role?.code ?? "").toLowerCase() === "expert");
   }, [expertUsers]);
@@ -350,11 +377,6 @@ export function ConferenceDetailPage() {
                   <Link href={`/conferences/${id}/scores`}>Оценки</Link>
                 </Button>
               ) : null}
-              {(isOrganizerRole || isExpertRole || isTutorRole) ? (
-                <Button variant="outline" asChild>
-                  <Link href={`/conferences/${id}/comments`}>Комментарии</Link>
-                </Button>
-              ) : null}
             </>
           ) : null}
           <Button variant="outline" asChild>
@@ -503,17 +525,26 @@ export function ConferenceDetailPage() {
             <CardTitle className="text-lg">Проекты и результаты</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            {results.length ? (
-              results.slice(0, 5).map(item => (
+            {paginatedResultsPreview.length ? (
+              paginatedResultsPreview.map(item => (
                 <p key={item.id}>
-                  {item.project.title}: {item.total_score} баллов, место {item.rank}
+                  {item.project.title}: {item.total_score} б., место {item.rank}
                 </p>
               ))
             ) : (
               <p>Результаты будут доступны после расчёта.</p>
             )}
-            <Button variant="outline" asChild>
-              <Link href={id ? `/conferences/${id}/scores` : "/scores"}>Перейти к оценкам</Link>
+            {results.length > RESULTS_PREVIEW_PER_PAGE ? (
+              <div className="flex flex-wrap items-center justify-between gap-1 pt-1 text-xs">
+                <span>{resultsPreviewPage} / {resultsPreviewTotalPages}</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={resultsPreviewPage <= 1} onClick={() => setResultsPreviewPage(p => Math.max(1, p - 1))}>←</Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={resultsPreviewPage >= resultsPreviewTotalPages} onClick={() => setResultsPreviewPage(p => Math.min(resultsPreviewTotalPages, p + 1))}>→</Button>
+                </div>
+              </div>
+            ) : null}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={id ? `/conferences/${id}/scores` : "/scores"}>К оценкам</Link>
             </Button>
           </CardContent>
         </Card>
@@ -693,39 +724,23 @@ export function ConferenceDetailPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {conferenceExperts.length ? (
-              conferenceExperts.map(item => (
-                <div key={item.id} className="rounded-md border border-border/60 bg-background/70 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+            {paginatedExperts.length ? (
+              paginatedExperts.map(item => (
+                <div key={item.id} className="rounded-md border border-border/60 bg-background/70 p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-foreground">
+                      <p className="font-semibold text-foreground text-sm">
                         {item.expert?.last_name} {item.expert?.first_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Секции:{" "}
-                        {item.sections?.length
-                          ? item.sections.map(section => section.name).join(", ")
-                          : "все секции"}
+                        {item.sections?.length ? item.sections.map(s => s.name).join(", ") : "все секции"}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingExpertId(item.id);
-                          setExpertForm({
-                            expertId: item.expert?.id ? String(item.expert.id) : "",
-                            sectionIds: item.sections?.map(section => String(section.id)) ?? [],
-                          });
-                          setIsExpertModalOpen(true);
-                        }}
-                      >
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditingExpertId(item.id); setExpertForm({ expertId: item.expert?.id ? String(item.expert.id) : "", sectionIds: item.sections?.map(s => String(s.id)) ?? [] }); setIsExpertModalOpen(true); }}>
                         Настроить
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => removeConferenceExpert(item.id)}>
-                        Удалить
-                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => removeConferenceExpert(item.id)}>Удалить</Button>
                     </div>
                   </div>
                 </div>
@@ -733,21 +748,31 @@ export function ConferenceDetailPage() {
             ) : (
               <p>Эксперты пока не приглашены.</p>
             )}
+            {conferenceExperts.length > EXPERTS_PER_PAGE ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
+                <span>Показано {paginatedExperts.length} из {conferenceExperts.length}</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={expertsPage <= 1} onClick={() => setExpertsPage(p => Math.max(1, p - 1))}>←</Button>
+                  <span>{expertsPage} / {expertsTotalPages}</span>
+                  <Button size="sm" variant="outline" className="h-7 px-2" disabled={expertsPage >= expertsTotalPages} onClick={() => setExpertsPage(p => Math.min(expertsTotalPages, p + 1))}>→</Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
 
       <div className="space-y-3">
         <h2 className="text-xl font-semibold">Секции конференции</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {visibleSections.length ? (
-            visibleSections.map(section => (
-              <Card key={section.name} className="border-border/70 bg-card/80">
-                <CardHeader className="space-y-2">
-                  <CardTitle className="text-lg">{section.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{section.age}</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {paginatedSectionsForDisplay.length ? (
+            paginatedSectionsForDisplay.map(section => (
+              <Card key={section.id} className="border-border/70 bg-card/80">
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base">{section.name}</CardTitle>
+                  <p className="text-xs text-muted-foreground">{section.age}</p>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
+                <CardContent className="py-0 text-sm text-muted-foreground">
                   <p>{section.format}</p>
                 </CardContent>
               </Card>
@@ -760,39 +785,52 @@ export function ConferenceDetailPage() {
             </Card>
           )}
         </div>
+        {sectionsForDisplay.length > SECTIONS_PER_PAGE ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>Показано {paginatedSectionsForDisplay.length} из {sectionsForDisplay.length}</span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-7" disabled={sectionsPage <= 1} onClick={() => setSectionsPage(p => Math.max(1, p - 1))}>Назад</Button>
+              <span>{sectionsPage} / {sectionsTotalPages}</span>
+              <Button size="sm" variant="outline" className="h-7" disabled={sectionsPage >= sectionsTotalPages} onClick={() => setSectionsPage(p => Math.min(sectionsTotalPages, p + 1))}>Вперёд</Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold">Результаты</h2>
-        </div>
+        <h2 className="text-xl font-semibold">Результаты</h2>
         {resultMessage ? <p className="text-sm text-muted-foreground">{resultMessage}</p> : null}
-        <div className="grid gap-4 md:grid-cols-2">
-          {results.length ? (
-            results.map(result => (
+        <div className="grid gap-3 md:grid-cols-2">
+          {paginatedResultsBottom.length ? (
+            paginatedResultsBottom.map(result => (
               <Card key={result.id} className="border-border/70 bg-card/80">
-                <CardHeader className="space-y-1">
-                  <CardTitle className="text-lg">{result.project.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{result.section.name}</p>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base">{result.project.title}</CardTitle>
+                  <p className="text-xs text-muted-foreground">{result.section.name}</p>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  <p>Итог: {result.total_score}</p>
-                  <p>Очный: {result.offline_score} | Заочный: {result.online_score}</p>
-                  <p>Место: {result.rank}</p>
-                  <p>
-                    {result.is_winner ? "Победитель" : result.is_prize ? "Призёр" : "Участник"}
-                  </p>
+                <CardContent className="py-0 text-sm text-muted-foreground">
+                  <p>Итог: {result.total_score} · Место: {result.rank} · {result.is_winner ? "Победитель" : result.is_prize ? "Призёр" : "Участник"}</p>
                 </CardContent>
               </Card>
             ))
           ) : (
-            <Card className="border-border/70 bg-card/80">
+            <Card className="border-border/70 bg-card/80 md:col-span-2">
               <CardContent className="p-6 text-sm text-muted-foreground">
                 Результаты ещё не рассчитаны.
               </CardContent>
             </Card>
           )}
         </div>
+        {results.length > RESULTS_PER_PAGE ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>Показано {paginatedResultsBottom.length} из {results.length}</span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-7" disabled={resultsPage <= 1} onClick={() => setResultsPage(p => Math.max(1, p - 1))}>Назад</Button>
+              <span>{resultsPage} / {resultsTotalPages}</span>
+              <Button size="sm" variant="outline" className="h-7" disabled={resultsPage >= resultsTotalPages} onClick={() => setResultsPage(p => Math.min(resultsTotalPages, p + 1))}>Вперёд</Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
