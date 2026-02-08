@@ -114,9 +114,14 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
                 )}
               </>
             ) : (
-              <Button variant="outline" asChild>
-                <Link href="/login">Войти</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/login">Войти</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/register">Регистрация</Link>
+                </Button>
+              </div>
             )}
           </div>
         </div>

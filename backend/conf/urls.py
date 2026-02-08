@@ -15,6 +15,7 @@ from conf.views import (
     ProjectResultViewSet,
     ExpertAssignmentViewSet,
     ExpertAssignmentItemViewSet,
+    PublicStatsView,
 )
 
 router = DefaultRouter()
@@ -43,4 +44,5 @@ router.register(r"assignment-items", ExpertAssignmentItemViewSet, basename="assi
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("public-stats/", PublicStatsView.as_view(), name="public-stats"),
 ]

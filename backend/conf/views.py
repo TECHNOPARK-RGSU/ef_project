@@ -10,8 +10,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.http import HttpResponse
 from django.shortcuts import render
 from openpyxl import Workbook
@@ -48,6 +49,7 @@ from conf.serializers import (
     ExpertAssignmentSerializer,
     ExpertAssignmentItemSerializer,
 )
+from users.models import User
 from conf.services.results import calculate_results_for_conference
 from utils.permissions import RoleBasedPermission
 from users.models import User
@@ -677,3 +679,32 @@ class ExpertAssignmentItemViewSet(viewsets.ModelViewSet):
         if role_code == "organizer":
             return queryset
         return queryset.none()
+
+
+class PublicStatsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        conferences_count = Conference.objects.filter(is_archived=False).count()
+        sections_count = Section.objects.filter(is_archived=False).count()
+        projects_count = Project.objects.filter(is_archived=False).count()
+        participants_count = User.objects.filter(
+            is_archived=False,
+        ).filter(
+            Q(role__code__iexact="student")
+            | Q(role__code__iexact="student2")
+            | Q(role__code__iexact="student3")
+        ).count()
+        experts_count = User.objects.filter(
+            is_archived=False,
+            role__code__iexact="expert",
+        ).count()
+        return Response(
+            {
+                "conferences": conferences_count,
+                "sections": sections_count,
+                "projects": projects_count,
+                "participants": participants_count,
+                "experts": experts_count,
+            }
+        )

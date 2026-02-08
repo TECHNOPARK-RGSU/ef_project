@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchList } from "@/lib/api";
+import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import type { Conference, Section } from "@/lib/types";
@@ -16,6 +16,13 @@ export function HomePage() {
   const isExpertRole = roleCode === "expert";
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [publicStats, setPublicStats] = useState<{
+    conferences: number;
+    sections: number;
+    projects: number;
+    participants: number;
+    experts: number;
+  } | null>(null);
   const roleContext =
     isStudentRole || isTutorRole
       ? {
@@ -60,7 +67,6 @@ export function HomePage() {
           : null;
 
   useEffect(() => {
-    if (isGuest) return;
     const controller = new AbortController();
 
     const load = async () => {
@@ -74,10 +80,9 @@ export function HomePage() {
 
     load();
     return () => controller.abort();
-  }, [isGuest]);
+  }, []);
 
   useEffect(() => {
-    if (isGuest) return;
     const controller = new AbortController();
     const loadMeta = async () => {
       try {
@@ -90,18 +95,52 @@ export function HomePage() {
 
     loadMeta();
     return () => controller.abort();
-  }, [isGuest]);
+  }, []);
 
-  const stats = isGuest
-    ? [
-        { value: "—", label: "Проведено конференций" },
-        { value: "—", label: "Участников" },
-        { value: "—", label: "Экспертных проверок" },
-      ]
-    : [
-        { value: String(conferences.length), label: "Конференций" },
-        { value: String(sections.length), label: "Секций" },
-      ];
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadStats = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/conf/public-stats/`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          conferences?: number;
+          sections?: number;
+          projects?: number;
+          participants?: number;
+          experts?: number;
+        };
+        setPublicStats({
+          conferences: data.conferences ?? 0,
+          sections: data.sections ?? 0,
+          projects: data.projects ?? 0,
+          participants: data.participants ?? 0,
+          experts: data.experts ?? 0,
+        });
+      } catch {
+        setPublicStats(null);
+      }
+    };
+    loadStats();
+    return () => controller.abort();
+  }, []);
+
+  const stats = [
+    {
+      value: publicStats ? String(publicStats.conferences) : String(conferences.length),
+      label: "Проведено конференций",
+    },
+    {
+      value: publicStats ? String(publicStats.participants) : "—",
+      label: "Участников",
+    },
+    {
+      value: publicStats ? String(publicStats.projects) : "—",
+      label: "Проектов",
+    },
+  ];
 
   return (
     <>
@@ -111,10 +150,10 @@ export function HomePage() {
             projectaris
           </p>
           <h1 className="text-4xl font-semibold leading-tight text-balance md:text-5xl">
-            Управляйте очными и заочными конференциями без лишних табличек
+            Projectaris помогает работать с конференциями, проектами и экспертизой в одном месте
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground">
-            Минимальный, понятный и аккуратный интерфейс для организаторов, участников и экспертов.
+            Участникам — быстрые заявки, наставникам — контроль проектов, экспертам — оценка, организаторам — управление процессом.
           </p>
           <div className="flex flex-wrap gap-3">
             {isGuest ? (
@@ -142,21 +181,20 @@ export function HomePage() {
               </Card>
             ))}
           </div>
-          {isGuest ? (
-            <p className="text-xs text-muted-foreground">Подробная статистика доступна после входа.</p>
-          ) : null}
+          <p className="text-xs text-muted-foreground">Статистика обновляется автоматически.</p>
         </div>
 
         <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
-          <div className="absolute -right-20 -top-16 size-64 rounded-full bg-accent/60 blur-3xl" />
-          <div className="absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
-          <CardHeader className="space-y-1">
+          <div className="pointer-events-none absolute -right-20 -top-16 size-64 rounded-full bg-accent/40 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-background/20 to-background/50" />
+          <CardHeader className="space-y-1 relative z-10">
             <CardTitle className="text-xl">{roleContext ? roleContext.title : "Начать работу"}</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {roleContext ? roleContext.description : "Создайте аккаунт или войдите, чтобы продолжить."}
+              {roleContext ? roleContext.description : "Создайте аккаунт или войдите, чтобы получить доступ к личному кабинету."}
             </p>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <CardContent className="space-y-4 text-sm text-muted-foreground relative z-10">
             {roleContext ? (
               <div className="grid gap-2">
                 {roleContext.actions.map(action => (
@@ -167,11 +205,11 @@ export function HomePage() {
               </div>
             ) : (
               <div className="grid gap-2">
-                <Button className="w-full" asChild>
-                  <Link href="/register">Регистрация</Link>
-                </Button>
                 <Button className="w-full" variant="outline" asChild>
                   <Link href="/login">Войти</Link>
+                </Button>
+                <Button className="w-full" asChild>
+                  <Link href="/register">Регистрация</Link>
                 </Button>
               </div>
             )}
@@ -180,6 +218,30 @@ export function HomePage() {
             </p>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mt-16 grid gap-4 md:grid-cols-3">
+        {[
+          {
+            title: "Участникам",
+            text: "Подавайте проекты, прикрепляйте материалы и следите за статусом.",
+          },
+          {
+            title: "Наставникам",
+            text: "Контролируйте заявки, комментируйте правки и помогайте авторам.",
+          },
+          {
+            title: "Экспертам",
+            text: "Получайте назначения, оценивайте по критериям и фиксируйте результаты.",
+          },
+        ].map(item => (
+          <Card key={item.title} className="border-border/70 bg-card/85">
+            <CardHeader>
+              <CardTitle className="text-lg">{item.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">{item.text}</CardContent>
+          </Card>
+        ))}
       </section>
 
     </>
