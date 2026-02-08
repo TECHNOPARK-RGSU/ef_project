@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL } from "@/lib/api";
+import { PHONE_COUNTRY_CODES } from "@/lib/phoneCountries";
 import { getAssetUrl } from "@/lib/utils";
 import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
 import { Link } from "wouter";
 
@@ -16,22 +17,67 @@ const REGISTRATION_ROLES = [
   { value: "expert", label: "Эксперт" },
 ] as const;
 
-const PHONE_PLACEHOLDER = "+7 (999) 999-99-99";
+const DEFAULT_PHONE_CODE = "7";
 
-function formatPhoneDisplay(digits: string): string {
-  const d = digits.replace(/\D/g, "").slice(0, 11);
-  if (d.length === 0) return "";
-  if (d.startsWith("8")) return formatPhoneDisplay("7" + d.slice(1));
-  const ten = d.startsWith("7") ? d.slice(1, 11) : d.slice(0, 10);
-  if (ten.length <= 3) return `+7 (${ten}`;
-  if (ten.length <= 6) return `+7 (${ten.slice(0, 3)}) ${ten.slice(3)}`;
-  return `+7 (${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6, 8)}-${ten.slice(8, 10)}`;
+function getPhoneMaxLength(code: string): number {
+  if (code === "7") return 10;
+  if (code === "1") return 10;
+  return 15;
 }
 
-function phoneToDigits(display: string): string {
+/** Форматирует только национальную часть номера (без кода страны). */
+function formatPhoneDisplay(digits: string, countryCode: string): string {
+  const maxLen = getPhoneMaxLength(countryCode);
+  let d = digits.replace(/\D/g, "").slice(0, maxLen);
+  if (d.length === 0) return "";
+  if (countryCode === "7") {
+    if (d.startsWith("8")) d = d.slice(1);
+    if (d.startsWith("7")) d = d.slice(1);
+    const ten = d.slice(0, 10);
+    if (ten.length <= 3) return `(${ten}`;
+    if (ten.length <= 6) return `(${ten.slice(0, 3)}) ${ten.slice(3)}`;
+    return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6, 8)}-${ten.slice(8, 10)}`;
+  }
+  const groups: string[] = [];
+  for (let i = 0; i < d.length; i += 3) groups.push(d.slice(i, i + 3));
+  return groups.join(" ");
+}
+
+/** Из отображаемой национальной части извлекает только цифры. */
+function phoneToDigits(display: string, countryCode: string): string {
   const d = display.replace(/\D/g, "");
-  if (d.startsWith("7")) return d.slice(0, 11);
-  return d.slice(0, 10);
+  if (countryCode === "7") {
+    if (d.startsWith("8")) return d.slice(1, 11);
+    if (d.startsWith("7")) return d.slice(1, 11);
+    return d.slice(0, 10);
+  }
+  return d.slice(0, getPhoneMaxLength(countryCode));
+}
+
+function getPhonePlaceholder(countryCode: string): string {
+  if (countryCode === "7") return "(999) 999-99-99";
+  return "999 999 99 99";
+}
+
+/** Количество цифр в строке до позиции pos (не включая pos). */
+function digitCountBefore(str: string, pos: number): number {
+  let count = 0;
+  for (let i = 0; i < pos && i < str.length; i++) {
+    if (/\d/.test(str.charAt(i))) count++;
+  }
+  return count;
+}
+
+/** Позиция в отформатированной строке после digitCount цифр. */
+function cursorAfterDigits(formatted: string, digitCount: number): number {
+  let count = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (/\d/.test(formatted.charAt(i))) {
+      count++;
+      if (count === digitCount) return i + 1;
+    }
+  }
+  return formatted.length;
 }
 
 function validateEmail(value: string): boolean {
@@ -41,14 +87,16 @@ function validateEmail(value: string): boolean {
   return re.test(trimmed) && trimmed.length <= 254;
 }
 
-function validatePhoneDigits(digits: string): boolean {
+function validatePhoneDigits(digits: string, countryCode: string): boolean {
   if (digits.length === 0) return true;
-  return digits.length === 10 && /^[0-9]{10}$/.test(digits);
+  const max = getPhoneMaxLength(countryCode);
+  if (countryCode === "7") return digits.length === 10 && /^[0-9]{10}$/.test(digits);
+  return digits.length >= 4 && digits.length <= max && /^[0-9]+$/.test(digits);
 }
 
-function phoneDigitsToApi(digits: string): string {
+function phoneDigitsToApi(digits: string, countryCode: string): string {
   if (digits.length === 0) return "";
-  return "+7" + (digits.length === 10 ? digits : digits.padEnd(10, "0").slice(0, 10));
+  return "+" + countryCode + digits;
 }
 
 type FormErrors = Partial<Record<string, string>>;
@@ -58,6 +106,8 @@ export function RegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const pendingPhoneCursorRef = useRef<number | null>(null);
   const [form, setForm] = useState({
     lastName: "",
     firstName: "",
@@ -66,15 +116,40 @@ export function RegisterPage() {
     password: "",
     confirmPassword: "",
     roleCode: "student",
+    phoneCountryCode: DEFAULT_PHONE_CODE,
     phone: "",
     city: "",
   });
 
-  const setPhone = (value: string) => {
-    const digits = phoneToDigits(value);
-    setForm(current => ({ ...current, phone: formatPhoneDisplay(digits) }));
+  const setPhone = (value: string, cursorStart?: number) => {
+    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+    const digits = phoneToDigits(value, code);
+    const formatted = formatPhoneDisplay(digits, code);
+    if (typeof cursorStart === "number" && cursorStart >= 0) {
+      const digitsBefore = digitCountBefore(value, cursorStart);
+      pendingPhoneCursorRef.current = cursorAfterDigits(formatted, digitsBefore);
+    } else {
+      pendingPhoneCursorRef.current = null;
+    }
+    setForm(current => ({ ...current, phone: formatted }));
     if (errors.phone) setErrors(e => ({ ...e, phone: undefined }));
   };
+
+  const setPhoneCountry = (code: string) => {
+    const digits = phoneToDigits(form.phone, form.phoneCountryCode || DEFAULT_PHONE_CODE);
+    const formatted = formatPhoneDisplay(digits, code);
+    setForm(current => ({ ...current, phoneCountryCode: code, phone: formatted }));
+    if (errors.phone) setErrors(e => ({ ...e, phone: undefined }));
+  };
+
+  useEffect(() => {
+    const input = phoneInputRef.current;
+    const pending = pendingPhoneCursorRef.current;
+    if (input && typeof pending === "number") {
+      pendingPhoneCursorRef.current = null;
+      input.setSelectionRange(pending, pending);
+    }
+  }, [form.phone]);
 
   const runValidation = (): boolean => {
     const e: FormErrors = {};
@@ -85,8 +160,11 @@ export function RegisterPage() {
     if (!form.password) e.password = "Укажите пароль.";
     else if (form.password.length < 6) e.password = "Минимум 6 символов.";
     if (form.password !== form.confirmPassword) e.confirmPassword = "Пароли не совпадают.";
-    const phoneDigits = phoneToDigits(form.phone);
-    if (phoneDigits.length > 0 && !validatePhoneDigits(phoneDigits)) e.phone = "Введите номер в формате +7 (999) 999-99-99.";
+    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+    const phoneDigits = phoneToDigits(form.phone, code);
+    if (phoneDigits.length > 0 && !validatePhoneDigits(phoneDigits, code)) {
+      e.phone = code === "7" ? "Введите номер в формате (999) 999-99-99." : "Введите корректный номер.";
+    }
     setErrors(e);
     setMessage(Object.keys(e).length > 0 ? "Исправьте ошибки в форме." : null);
     return Object.keys(e).length === 0;
@@ -107,7 +185,10 @@ export function RegisterPage() {
         email: form.email.trim().toLowerCase(),
         password: form.password,
         role_code: form.roleCode,
-        phone: phoneDigitsToApi(phoneToDigits(form.phone)),
+        phone: phoneDigitsToApi(
+          phoneToDigits(form.phone, form.phoneCountryCode || DEFAULT_PHONE_CODE),
+          form.phoneCountryCode || DEFAULT_PHONE_CODE,
+        ),
         city: form.city.trim(),
       }),
     });
@@ -134,6 +215,7 @@ export function RegisterPage() {
       password: "",
       confirmPassword: "",
       roleCode: "student",
+      phoneCountryCode: DEFAULT_PHONE_CODE,
       phone: "",
       city: "",
     });
@@ -277,18 +359,42 @@ export function RegisterPage() {
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label>Телефон</Label>
-              <Input
-                type="tel"
-                autoComplete="tel"
-                value={form.phone}
-                onChange={e => setPhone(e.target.value)}
-                onBlur={() => {
-                  const digits = phoneToDigits(form.phone);
-                  if (digits.length > 0 && !validatePhoneDigits(digits)) setErrors(err => ({ ...err, phone: "Формат: +7 (999) 999-99-99" }));
-                }}
-                placeholder={PHONE_PLACEHOLDER}
-                className={errors.phone ? "border-destructive" : ""}
-              />
+              <div className="flex gap-2">
+                <Select
+                  value={form.phoneCountryCode}
+                  onValueChange={setPhoneCountry}
+                >
+                  <SelectTrigger className="w-[140px] shrink-0">
+                    <SelectValue placeholder="Код" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PHONE_COUNTRY_CODES.map((c, i) => (
+                      <SelectItem key={`${c.code}-${c.name}-${i}`} value={c.code}>
+                        +{c.code} {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  ref={phoneInputRef}
+                  type="tel"
+                  autoComplete="tel"
+                  value={form.phone}
+                  onChange={e => {
+                    const el = e.target;
+                    setPhone(el.value, el.selectionStart ?? undefined);
+                  }}
+                  onBlur={() => {
+                    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+                    const digits = phoneToDigits(form.phone, code);
+                    if (digits.length > 0 && !validatePhoneDigits(digits, code)) {
+                      setErrors(err => ({ ...err, phone: code === "7" ? "Формат: (999) 999-99-99" : "Введите корректный номер" }));
+                    }
+                  }}
+                  placeholder={getPhonePlaceholder(form.phoneCountryCode || DEFAULT_PHONE_CODE)}
+                  className={`flex-1 ${errors.phone ? "border-destructive" : ""}`}
+                />
+              </div>
               {errors.phone ? <p className="text-xs text-destructive">{errors.phone}</p> : null}
             </div>
             <div className="space-y-1.5 md:col-span-2">

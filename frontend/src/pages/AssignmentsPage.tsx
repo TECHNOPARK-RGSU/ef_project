@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
@@ -49,6 +50,7 @@ export function AssignmentsPage() {
     assignment: ExpertAssignment;
   } | null>(null);
   const [scoreForm, setScoreForm] = useState<Record<number, string>>({});
+  const [scoreComment, setScoreComment] = useState("");
   const [scoreMessage, setScoreMessage] = useState<string | null>(null);
 
   const refreshAssignments = async () => {
@@ -219,6 +221,7 @@ export function AssignmentsPage() {
       else initial[c.id] = "";
     });
     setScoreForm(initial);
+    setScoreComment("");
     setScoreModal({ projectId, projectTitle: item.project.title, assignment });
     setScoreMessage(null);
   };
@@ -227,6 +230,7 @@ export function AssignmentsPage() {
     if (!scoreModal || !getAuthToken()) return;
     setScoreMessage(null);
     const assignmentCriteria = criteriaForAssignment(scoreModal.assignment);
+    let savedAny = false;
     for (const criterion of assignmentCriteria) {
       const value = scoreForm[criterion.id]?.trim();
       if (value === "") continue;
@@ -249,13 +253,44 @@ export function AssignmentsPage() {
         }),
       });
       if (!response.ok) {
-        setScoreMessage("Не удалось сохранить оценку.");
+        let errText = "Не удалось сохранить оценку.";
+        try {
+          const data = (await response.json()) as Record<string, string | string[]>;
+          const parts = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(" ") : v}`);
+          if (parts.length) errText = parts.join(" ");
+        } catch {
+          // ignore
+        }
+        setScoreMessage(errText);
         return;
       }
       const created = (await response.json()) as ProjectScore;
       setScores(prev => (existing ? prev.map(s => (s.id === existing.id ? created : s)) : [created, ...prev]));
+      savedAny = true;
     }
-    setScoreMessage("Оценки сохранены.");
+    if (scoreComment.trim()) {
+      const commentResponse = await fetch(`${API_BASE_URL}/api/conf/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getAuthToken()}` },
+        body: JSON.stringify({
+          project_id: scoreModal.projectId,
+          text: scoreComment.trim(),
+        }),
+      });
+      if (!commentResponse.ok) {
+        let errText = "Оценки сохранены. Комментарий не удалось отправить.";
+        try {
+          const data = (await commentResponse.json()) as Record<string, string | string[]>;
+          const parts = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(" ") : v}`);
+          if (parts.length) errText = "Оценки сохранены. " + parts.join(" ");
+        } catch {
+          // ignore
+        }
+        setScoreMessage(errText);
+        return;
+      }
+    }
+    setScoreMessage(savedAny ? "Оценки сохранены." : scoreComment.trim() ? "Комментарий сохранён." : "Заполните баллы или комментарий.");
     setScoreModal(null);
   };
 
@@ -477,34 +512,32 @@ export function AssignmentsPage() {
                           </tbody>
                         </table>
                       </div>
-                      {items.length > ASSIGNMENT_ITEMS_PER_PAGE ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-muted-foreground">
-                          <span>
-                            Показано {start + 1}–{start + paginatedItems.length} из {items.length}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2"
-                              disabled={itemPage <= 1}
-                              onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.max(1, itemPage - 1) }))}
-                            >
-                              ←
-                            </Button>
-                            <span>{itemPage} / {itemTotalPages}</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2"
-                              disabled={itemPage >= itemTotalPages}
-                              onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.min(itemTotalPages, itemPage + 1) }))}
-                            >
-                              →
-                            </Button>
-                          </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-muted-foreground">
+                        <span>
+                          Показано {start + 1}–{start + paginatedItems.length} из {items.length}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            disabled={itemPage <= 1}
+                            onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.max(1, itemPage - 1) }))}
+                          >
+                            ←
+                          </Button>
+                          <span>{itemPage} / {itemTotalPages}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            disabled={itemPage >= itemTotalPages}
+                            onClick={() => setAssignmentItemsPage(prev => ({ ...prev, [assignment.id]: Math.min(itemTotalPages, itemPage + 1) }))}
+                          >
+                            →
+                          </Button>
                         </div>
-                      ) : null}
+                      </div>
                     </>
                   ) : (
                     <p className="py-2 text-sm text-muted-foreground">Работ пока нет.</p>
@@ -579,10 +612,25 @@ export function AssignmentsPage() {
                   ))}
                 </div>
               )}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Комментарий к работе</Label>
+                <Textarea
+                  placeholder="Комментарий увидят участник, наставник и организатор (необязательно)"
+                  value={scoreComment}
+                  onChange={e => setScoreComment(e.target.value)}
+                  rows={3}
+                  className="resize-y min-h-[60px]"
+                />
+              </div>
               {scoreMessage ? <p className="text-sm text-muted-foreground">{scoreMessage}</p> : null}
               <div className="flex gap-2">
-                <Button onClick={saveScores} disabled={criteriaForAssignment(scoreModal.assignment).length === 0}>
-                  Сохранить оценки
+                <Button
+                  onClick={saveScores}
+                  disabled={
+                    criteriaForAssignment(scoreModal.assignment).length === 0 && !scoreComment.trim()
+                  }
+                >
+                  Сохранить оценки и комментарий
                 </Button>
                 <Button variant="outline" onClick={() => setScoreModal(null)}>
                   Отмена
