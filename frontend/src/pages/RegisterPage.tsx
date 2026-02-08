@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
+import { getAssetUrl } from "@/lib/utils";
 import { useState } from "react";
 import projectarisLogo from "@/assets/projectaris-logo.svg";
 import { Link } from "wouter";
@@ -89,7 +90,7 @@ export function RegisterPage() {
         <CardHeader>
           <div className="mb-2 flex items-center gap-3">
             <img
-              src={projectarisLogo}
+              src={getAssetUrl(projectarisLogo)}
               alt="Projectaris"
               className="size-10 rounded-full border border-border/60 bg-background/80 p-1"
             />

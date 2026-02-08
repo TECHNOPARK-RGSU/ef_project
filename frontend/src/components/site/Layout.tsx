@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { clearAuthToken, getAuthToken } from "@/lib/auth";
+import { getAssetUrl } from "@/lib/utils";
 import { getRoleLabel, isStudentRole, normalizeRoleCode } from "@/lib/roles";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -52,7 +53,7 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/75 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-6">
           <Link href="/" className="flex items-center gap-3">
-            <img src={projectarisLogo} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
+            <img src={getAssetUrl(projectarisLogo)} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
             <div>
               <p className="text-base font-semibold md:text-lg">Projectaris</p>
               <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">
