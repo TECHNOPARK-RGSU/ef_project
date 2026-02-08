@@ -83,7 +83,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "config" / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -160,6 +160,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
+_CONFIG_STATIC = BASE_DIR / "config" / "static"
+STATICFILES_DIRS = [_CONFIG_STATIC] if _CONFIG_STATIC.exists() else []
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+{% load static i18n %}
+
+{% block title %}{% if title %}{{ title }} | {% endif %}Projectaris{% endblock %}
+
+{% block branding %}
+<div id="branding">
+  <a href="{% url 'admin:index' %}" id="site-name" class="admin-site-brand">
+    <img src="{% static 'admin/img/logo.svg' %}" alt="" width="36" height="36" class="admin-site-logo" />
+    <span class="admin-site-title">Projectaris</span>
+    <span class="admin-site-subtitle">{% trans 'Администрирование' %}</span>
+  </a>
+</div>
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'admin/css/site.css' %}">
+{% endblock %}

@@ -15,6 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+
+admin.site.site_header = "Projectaris"
+admin.site.site_title = "Projectaris"
+admin.site.index_title = "Администрирование"
+
 from django.db import connections
 from django.db.utils import OperationalError
 from django.http import JsonResponse

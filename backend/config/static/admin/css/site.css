@@ -1,0 +1,188 @@
+/* Projectaris — стили админки в духе основного сайта */
+
+:root {
+  --admin-primary: #03515f;
+  --admin-primary-hover: #023d48;
+  --admin-primary-fg: #fff;
+  --admin-bg: #f9f8f2;
+  --admin-card: #fff;
+  --admin-border: #e5e3d9;
+  --admin-input-bg: #fff;
+  --admin-link: #03515f;
+  --admin-link-hover: #023d48;
+  --admin-font: "Onest", "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--admin-font) !important;
+  background: var(--admin-bg) !important;
+  color: #2c2c2c !important;
+}
+
+/* Шапка — как на сайте, цвет бренда */
+#header {
+  background: var(--admin-primary) !important;
+  color: var(--admin-primary-fg) !important;
+}
+
+#branding h1,
+#branding a {
+  color: var(--admin-primary-fg) !important;
+}
+
+.admin-site-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  text-decoration: none !important;
+  color: var(--admin-primary-fg) !important;
+  font-weight: 600 !important;
+  font-size: 1.1rem !important;
+}
+
+.admin-site-logo {
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.admin-site-title {
+  font-weight: 700;
+}
+
+.admin-site-subtitle {
+  font-size: 0.75rem !important;
+  font-weight: 400 !important;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 0.25rem;
+}
+
+/* Ссылки в шапке (выйти и т.д.) */
+#user-tools a {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#user-tools a:hover {
+  color: #fff !important;
+}
+
+/* Левая колонка — модули */
+#content-main,
+.module {
+  font-family: var(--admin-font) !important;
+}
+
+#content h1 {
+  font-family: var(--admin-font) !important;
+  font-weight: 600 !important;
+  color: var(--admin-primary) !important;
+}
+
+/* Кнопки и акценты */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+  background: var(--admin-primary) !important;
+  color: var(--admin-primary-fg) !important;
+  border: none !important;
+  font-family: var(--admin-font) !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+}
+
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+a.button:hover {
+  background: var(--admin-primary-hover) !important;
+  color: var(--admin-primary-fg) !important;
+}
+
+.button.default,
+input[type="submit"].default,
+.submit-row input.default {
+  background: var(--admin-primary) !important;
+}
+
+/* Ссылки в контенте */
+a {
+  color: var(--admin-link) !important;
+}
+
+a:hover {
+  color: var(--admin-link-hover) !important;
+}
+
+/* Формы */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+textarea,
+select {
+  font-family: var(--admin-font) !important;
+  border-radius: 6px !important;
+  border-color: var(--admin-border) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--admin-primary) !important;
+  outline: 2px solid rgba(3, 81, 95, 0.25) !important;
+}
+
+/* Карточки/блоки */
+.module h2,
+.module caption,
+.inline-group h2 {
+  background: var(--admin-primary) !important;
+  color: var(--admin-primary-fg) !important;
+  font-family: var(--admin-font) !important;
+  font-weight: 600 !important;
+  border-radius: 6px 6px 0 0 !important;
+}
+
+.changelist {
+  background: var(--admin-card) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--admin-border) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+#changelist-filter {
+  background: var(--admin-card) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--admin-border) !important;
+}
+
+#changelist-filter h2 {
+  background: transparent !important;
+  color: #2c2c2c !important;
+  font-size: 0.85rem !important;
+}
+
+/* Таблица списка */
+#result_list th a {
+  color: var(--admin-primary) !important;
+}
+
+#result_list th a:hover {
+  color: var(--admin-primary-hover) !important;
+}
+
+/* Сообщения */
+.messagelist li.success {
+  background: rgba(3, 81, 95, 0.12) !important;
+  border-left-color: var(--admin-primary) !important;
+}
+
+.messagelist li.warning {
+  background: rgba(233, 196, 106, 0.2) !important;
+}
+
+/* Логотип в title страницы не дублируем — уже в branding */
