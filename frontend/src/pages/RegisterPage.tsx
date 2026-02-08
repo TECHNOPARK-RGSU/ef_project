@@ -4,7 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_BASE_URL } from "@/lib/api";
-import { PHONE_COUNTRY_CODES } from "@/lib/phoneCountries";
+import {
+  DEFAULT_PHONE_COUNTRY_VALUE,
+  getCountryFlag,
+  getDialCodeFromValue,
+  PHONE_COUNTRY_CODES,
+} from "@/lib/phoneCountries";
 import { getAssetUrl } from "@/lib/utils";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +22,6 @@ const REGISTRATION_ROLES = [
   { value: "expert", label: "Эксперт" },
 ] as const;
 
-const DEFAULT_PHONE_CODE = "7";
 
 function getPhoneMaxLength(code: string): number {
   if (code === "7") return 10;
@@ -116,13 +120,13 @@ export function RegisterPage() {
     password: "",
     confirmPassword: "",
     roleCode: "student",
-    phoneCountryCode: DEFAULT_PHONE_CODE,
+    phoneCountryCode: DEFAULT_PHONE_COUNTRY_VALUE,
     phone: "",
     city: "",
   });
 
   const setPhone = (value: string, cursorStart?: number) => {
-    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+    const code = getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE);
     const digits = phoneToDigits(value, code);
     const formatted = formatPhoneDisplay(digits, code);
     if (typeof cursorStart === "number" && cursorStart >= 0) {
@@ -135,10 +139,12 @@ export function RegisterPage() {
     if (errors.phone) setErrors(e => ({ ...e, phone: undefined }));
   };
 
-  const setPhoneCountry = (code: string) => {
-    const digits = phoneToDigits(form.phone, form.phoneCountryCode || DEFAULT_PHONE_CODE);
-    const formatted = formatPhoneDisplay(digits, code);
-    setForm(current => ({ ...current, phoneCountryCode: code, phone: formatted }));
+  const setPhoneCountry = (value: string) => {
+    const prevCode = getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE);
+    const digits = phoneToDigits(form.phone, prevCode);
+    const newCode = getDialCodeFromValue(value);
+    const formatted = formatPhoneDisplay(digits, newCode);
+    setForm(current => ({ ...current, phoneCountryCode: value, phone: formatted }));
     if (errors.phone) setErrors(e => ({ ...e, phone: undefined }));
   };
 
@@ -160,7 +166,7 @@ export function RegisterPage() {
     if (!form.password) e.password = "Укажите пароль.";
     else if (form.password.length < 6) e.password = "Минимум 6 символов.";
     if (form.password !== form.confirmPassword) e.confirmPassword = "Пароли не совпадают.";
-    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+    const code = getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE);
     const phoneDigits = phoneToDigits(form.phone, code);
     if (phoneDigits.length > 0 && !validatePhoneDigits(phoneDigits, code)) {
       e.phone = code === "7" ? "Введите номер в формате (999) 999-99-99." : "Введите корректный номер.";
@@ -186,8 +192,8 @@ export function RegisterPage() {
         password: form.password,
         role_code: form.roleCode,
         phone: phoneDigitsToApi(
-          phoneToDigits(form.phone, form.phoneCountryCode || DEFAULT_PHONE_CODE),
-          form.phoneCountryCode || DEFAULT_PHONE_CODE,
+          phoneToDigits(form.phone, getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE)),
+          getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE),
         ),
         city: form.city.trim(),
       }),
@@ -215,7 +221,7 @@ export function RegisterPage() {
       password: "",
       confirmPassword: "",
       roleCode: "student",
-      phoneCountryCode: DEFAULT_PHONE_CODE,
+      phoneCountryCode: DEFAULT_PHONE_COUNTRY_VALUE,
       phone: "",
       city: "",
     });
@@ -364,13 +370,23 @@ export function RegisterPage() {
                   value={form.phoneCountryCode}
                   onValueChange={setPhoneCountry}
                 >
-                  <SelectTrigger className="w-[140px] shrink-0">
-                    <SelectValue placeholder="Код" />
+                  <SelectTrigger className="w-[100px] shrink-0">
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-lg leading-none">
+                        {getCountryFlag(
+                          (form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE).split("|")[1] || "RU",
+                        )}
+                      </span>
+                      <span>+{getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE)}</span>
+                    </span>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent searchPlaceholder="Поиск по стране">
                     {PHONE_COUNTRY_CODES.map((c, i) => (
-                      <SelectItem key={`${c.code}-${c.name}-${i}`} value={c.code}>
-                        +{c.code} {c.name}
+                      <SelectItem key={`${c.code}-${c.iso2}-${i}`} value={`${c.code}|${c.iso2}`}>
+                        <span className="flex items-center gap-2">
+                          <span className="text-base leading-none">{getCountryFlag(c.iso2)}</span>
+                          <span>+{c.code} {c.name}</span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -385,13 +401,13 @@ export function RegisterPage() {
                     setPhone(el.value, el.selectionStart ?? undefined);
                   }}
                   onBlur={() => {
-                    const code = form.phoneCountryCode || DEFAULT_PHONE_CODE;
+                    const code = getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE);
                     const digits = phoneToDigits(form.phone, code);
                     if (digits.length > 0 && !validatePhoneDigits(digits, code)) {
                       setErrors(err => ({ ...err, phone: code === "7" ? "Формат: (999) 999-99-99" : "Введите корректный номер" }));
                     }
                   }}
-                  placeholder={getPhonePlaceholder(form.phoneCountryCode || DEFAULT_PHONE_CODE)}
+                  placeholder={getPhonePlaceholder(getDialCodeFromValue(form.phoneCountryCode || DEFAULT_PHONE_COUNTRY_VALUE))}
                   className={`flex-1 ${errors.phone ? "border-destructive" : ""}`}
                 />
               </div>
