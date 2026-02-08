@@ -66,6 +66,9 @@ class Conference(BaseModel):
         verbose_name_plural = "Конференции"
         ordering = ["-start_date"]
 
+    def __str__(self):
+        return self.title
+
     def clean(self):
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError(
@@ -110,6 +113,11 @@ class AgeCategory(BaseModel):
             )
         ]
 
+    def __str__(self):
+        if self.min_age is not None and self.max_age is not None:
+            return f"{self.name} ({self.min_age}–{self.max_age} лет)"
+        return self.name
+
     def clean(self):
         if self.min_age is not None and self.max_age is not None:
             if self.min_age > self.max_age:
@@ -144,6 +152,10 @@ class Section(BaseModel):
         verbose_name = "Секция"
         verbose_name_plural = "Секции"
 
+    def __str__(self):
+        if self.conference_id:
+            return f"{self.name} — {self.conference}"
+        return self.name
 
 
 class ProjectStatus(BaseModel):
@@ -177,6 +189,11 @@ class ProjectStatus(BaseModel):
             )
         ]
 
+    def __str__(self):
+        if self.conference_id:
+            return f"{self.name} ({self.conference})"
+        return self.name
+
 
 class ParticipationStage(BaseModel):
     """Этап участия (привязан к конференции)."""
@@ -209,6 +226,11 @@ class ParticipationStage(BaseModel):
             )
         ]
 
+    def __str__(self):
+        if self.conference_id:
+            return f"{self.name} ({self.conference})"
+        return self.name
+
 
 class ConferenceStatusFlowItem(BaseModel):
     """Настройка воронки статусов для конференции."""
@@ -240,6 +262,9 @@ class ConferenceStatusFlowItem(BaseModel):
         ordering = ["order", "id"]
         unique_together = ("conference", "status")
 
+    def __str__(self):
+        return f"{self.conference}: {self.status} (порядок {self.order})"
+
 
 class ConferenceStageAvailability(BaseModel):
     """Доступные этапы участия для конференции."""
@@ -267,6 +292,9 @@ class ConferenceStageAvailability(BaseModel):
         ordering = ["stage__name", "id"]
         unique_together = ("conference", "stage")
 
+    def __str__(self):
+        return f"{self.conference}: {self.stage}"
+
 
 class Place(BaseModel):
     """Место проведения (привязано к конференции)."""
@@ -293,6 +321,11 @@ class Place(BaseModel):
         verbose_name = "Место"
         verbose_name_plural = "Места"
         ordering = ["created_at"]
+
+    def __str__(self):
+        if self.conference_id:
+            return f"{self.name} ({self.conference})"
+        return self.name
 
 
 class PresentationType(BaseModel):
@@ -331,6 +364,11 @@ class PresentationType(BaseModel):
                 name="unique_presentationtype_conf_code",
             )
         ]
+
+    def __str__(self):
+        if self.conference_id:
+            return f"{self.name} ({self.conference})"
+        return self.name
 
 
 class Project(BaseModel):
@@ -413,6 +451,9 @@ class Project(BaseModel):
             )
         ]
 
+    def __str__(self):
+        return self.title
+
 
 class Comment(BaseModel):
     """Комментарий эксперта/организатора к проекту."""
@@ -440,6 +481,11 @@ class Comment(BaseModel):
         verbose_name = "Комментарий"
         verbose_name_plural = "Комментарии"
         ordering = ["created_at"]
+
+    def __str__(self):
+        author = f" — {self.author}" if self.author_id else ""
+        text_preview = (self.text[:50] + "…") if len(self.text) > 50 else self.text
+        return f"{self.project}{author}: {text_preview}"
 
 
 class EvaluationCriterion(BaseModel):
@@ -483,6 +529,9 @@ class EvaluationCriterion(BaseModel):
                 name="unique_criterion_per_conference",
             )
         ]
+
+    def __str__(self):
+        return f"{self.name} ({self.conference}, {self.get_stage_display()})"
 
 
 class ProjectScore(BaseModel):
@@ -540,6 +589,10 @@ class ProjectScore(BaseModel):
 
         if errors:
             raise ValidationError(errors)
+
+    def __str__(self):
+        evaluator = f" — {self.evaluator}" if self.evaluator_id else ""
+        return f"{self.project} / {self.criterion}: {self.score}{evaluator}"
 
 
 class ProjectResult(BaseModel):
@@ -603,6 +656,9 @@ class ProjectResult(BaseModel):
         verbose_name = "Результат проекта"
         verbose_name_plural = "Результаты проектов"
 
+    def __str__(self):
+        return f"{self.project} — место {self.rank} ({self.conference})"
+
 
 class ConferenceExpert(BaseModel):
     """Эксперт, приглашенный в конференцию, с ограничением по секциям."""
@@ -630,6 +686,9 @@ class ConferenceExpert(BaseModel):
         verbose_name = "Эксперт конференции"
         verbose_name_plural = "Эксперты конференций"
         unique_together = ("conference", "expert")
+
+    def __str__(self):
+        return f"{self.expert} — {self.conference}"
 
 
 class ExpertAssignment(BaseModel):
@@ -673,6 +732,9 @@ class ExpertAssignment(BaseModel):
             )
         ]
 
+    def __str__(self):
+        return f"{self.expert} — {self.conference} ({self.get_stage_display()})"
+
 
 class ExpertAssignmentItem(BaseModel):
     """Конкретный проект в назначении эксперта."""
@@ -699,3 +761,6 @@ class ExpertAssignmentItem(BaseModel):
                 name="unique_assignment_project",
             )
         ]
+
+    def __str__(self):
+        return f"{self.project} в назначении #{self.assignment_id}"

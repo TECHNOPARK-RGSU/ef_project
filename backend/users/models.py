@@ -39,6 +39,11 @@ class EducationalOrganization(BaseModel):
             )
         ]
 
+    def __str__(self):
+        if self.short_name and self.short_name.strip():
+            return f"{self.short_name} ({self.city})"
+        return f"{self.name} ({self.city})"
+
 
 class Role(BaseModel):
     """Роль пользователя в системе/конференции (участник, эксперт, организатор и т.д.)."""
@@ -58,6 +63,9 @@ class Role(BaseModel):
         verbose_name = "Роль"
         verbose_name_plural = "Роли"
         ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
 
 
 class User(AbstractUser, BaseModel):
@@ -114,3 +122,11 @@ class User(AbstractUser, BaseModel):
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
         ordering = ["last_name", "first_name"]
+
+    def __str__(self):
+        parts = []
+        if self.last_name or self.first_name:
+            parts.append(f"{self.last_name or ''} {self.first_name or ''}".strip())
+        if self.email:
+            parts.append(f"({self.email})")
+        return " ".join(parts) if parts else f"Пользователь #{self.pk}"
