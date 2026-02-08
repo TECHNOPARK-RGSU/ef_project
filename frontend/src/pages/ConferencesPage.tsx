@@ -31,7 +31,6 @@ export function ConferencesPage() {
     winnersCount: "1",
     prizesCount: "2",
   });
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
@@ -52,26 +51,6 @@ export function ConferencesPage() {
     load();
     return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    if (state !== "ready" || !conferences.length) return;
-    let editId: string | null = null;
-    try {
-      editId = sessionStorage.getItem("conferenceEditId");
-    } catch {
-      /* ignore */
-    }
-    if (!editId) return;
-    const num = Number(editId);
-    if (!Number.isFinite(num)) return;
-    try {
-      sessionStorage.removeItem("conferenceEditId");
-    } catch {
-      /* ignore */
-    }
-    const conf = conferences.find(c => c.id === num);
-    if (conf) startEdit(conf);
-  }, [state, conferences]);
 
   const visibleConferences = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -100,7 +79,6 @@ export function ConferencesPage() {
     form.title.trim() && form.startDate && form.endDate && form.format;
 
   const handleCreateClick = () => {
-    setEditingId(null);
     setForm({
       title: "",
       startDate: "",
@@ -115,17 +93,29 @@ export function ConferencesPage() {
     setIsModalOpen(true);
   };
 
+  const closeModal = () => {
+    setForm({
+      title: "",
+      startDate: "",
+      endDate: "",
+      location: "",
+      format: "online",
+      description: "",
+      winnersCount: "1",
+      prizesCount: "2",
+    });
+    setSubmitMessage(null);
+    setIsModalOpen(false);
+  };
+
   const submitConference = async () => {
     setSubmitState("saving");
     setSubmitMessage(null);
     try {
       const token = getAuthToken();
       if (!token) throw new Error("missing token");
-      const endpoint = editingId
-        ? `/api/conf/conferences/${editingId}/`
-        : "/api/conf/conferences/";
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: editingId ? "PATCH" : "POST",
+      const response = await fetch(`${API_BASE_URL}/api/conf/conferences/`, {
+        method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
         body: JSON.stringify({
           title: form.title,
@@ -141,11 +131,9 @@ export function ConferencesPage() {
       });
       if (!response.ok) throw new Error("save failed");
       const created = (await response.json()) as Conference;
-      setConferences(current =>
-        editingId ? current.map(conf => (conf.id === editingId ? created : conf)) : [created, ...current],
-      );
+      setConferences(current => [created, ...current]);
       setSubmitState("saved");
-      setSubmitMessage(editingId ? "Конференция обновлена." : "Конференция создана.");
+      setSubmitMessage("Конференция создана.");
       setForm({
         title: "",
         startDate: "",
@@ -156,44 +144,11 @@ export function ConferencesPage() {
         winnersCount: "1",
         prizesCount: "2",
       });
-      setEditingId(null);
       setIsModalOpen(false);
     } catch (error) {
       setSubmitState("error");
-      setSubmitMessage(editingId ? "Не удалось обновить. Проверь API." : "Не удалось создать. Проверь API.");
+      setSubmitMessage("Не удалось создать. Проверь API.");
     }
-  };
-
-  const startEdit = (conf: Conference) => {
-    setEditingId(conf.id);
-    setForm({
-      title: conf.title,
-      startDate: conf.start_date,
-      endDate: conf.end_date,
-      location: conf.location ?? "",
-      format: conf.format ?? (conf.is_online ? "online" : "offline"),
-      description: conf.description ?? "",
-      winnersCount: conf.winners_count ? String(conf.winners_count) : "1",
-      prizesCount: conf.prizes_count ? String(conf.prizes_count) : "2",
-    });
-    setSubmitMessage(null);
-    setIsModalOpen(true);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm({
-      title: "",
-      startDate: "",
-      endDate: "",
-      location: "",
-      format: "online",
-      description: "",
-      winnersCount: "1",
-      prizesCount: "2",
-    });
-    setSubmitMessage(null);
-    setIsModalOpen(false);
   };
 
   const deleteConference = async (id: number) => {
@@ -355,13 +310,13 @@ export function ConferencesPage() {
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-lg">
-                  {editingId ? "Редактирование конференции" : "Новая конференция"}
+                  Новая конференция
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Заполните основные параметры конференции.
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              <Button variant="ghost" size="sm" onClick={closeModal}>
                 Закрыть
               </Button>
             </CardHeader>
@@ -451,9 +406,9 @@ export function ConferencesPage() {
               {submitMessage ? <p className="text-xs text-muted-foreground">{submitMessage}</p> : null}
               <div className="flex flex-wrap gap-2">
                 <Button className="w-full md:w-auto" disabled={!canSubmit || submitState === "saving"} onClick={submitConference}>
-                  {submitState === "saving" ? "Сохраняем…" : editingId ? "Сохранить" : "Создать конференцию"}
+                  {submitState === "saving" ? "Сохраняем…" : "Создать конференцию"}
                 </Button>
-                <Button variant="outline" onClick={cancelEdit}>
+                <Button variant="outline" onClick={closeModal}>
                   Отмена
                 </Button>
               </div>

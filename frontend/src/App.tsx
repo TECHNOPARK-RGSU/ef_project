@@ -3,6 +3,7 @@ import { ApplyPage } from "@/pages/ApplyPage";
 import { AssignmentsPage } from "@/pages/AssignmentsPage";
 import { CatalogsPage } from "@/pages/CatalogsPage";
 import { ConferenceDetailPage } from "@/pages/ConferenceDetailPage";
+import { ConferenceEditPage } from "@/pages/ConferenceEditPage";
 import { ConferenceResultsPage } from "@/pages/ConferenceResultsPage";
 import { ConferencesPage } from "@/pages/ConferencesPage";
 import { HomePage } from "@/pages/HomePage";
@@ -101,6 +102,7 @@ export function App() {
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;
     if (path === "/policy" || path === "/contacts" || path === "/documents") return true;
+    if (path.match(/^\/conferences\/\d+\/edit$/)) return canAccessAdminCatalogs;
     if (path === "/conferences" || path.startsWith("/conferences/")) return canAccessConferences;
     if (path === "/users" || path.startsWith("/users/")) return canAccessGlobalUsers;
     if (path === "/sections" || path === "/roles" || path === "/catalogs") return canAccessAdminCatalogs;
@@ -144,6 +146,7 @@ export function App() {
         <Switch>
           <Route path="/" component={HomePage} />
           {canAccessConferences ? <Route path="/conferences" component={ConferencesPage} /> : null}
+          {canAccessAdminCatalogs ? <Route path="/conferences/:id/edit" component={ConferenceEditPage} /> : null}
           {canAccessConferences ? <Route path="/conferences/:id" component={ConferenceDetailPage} /> : null}
           {canAccessConferences && canAccessApply ? <Route path="/conferences/:id/projects" component={ApplyPage} /> : null}
           {canAccessConferences && canAccessAssignments ? <Route path="/conferences/:id/assignments" component={AssignmentsPage} /> : null}
