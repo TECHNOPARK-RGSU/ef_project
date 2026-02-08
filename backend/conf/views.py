@@ -117,7 +117,7 @@ class ConferenceViewSet(viewsets.ModelViewSet):
         if getattr(user, "is_superuser", False):
             return queryset
         role_code = normalize_role_code(getattr(user.role, "code", ""))
-        if role_code == "organizer":
+        if role_code in ("organizer", "expert", "tutor", "student"):
             return queryset
         return queryset.none()
 
