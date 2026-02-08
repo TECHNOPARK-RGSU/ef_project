@@ -69,8 +69,10 @@ export function SiteLayout({ children, roleCode = "" }: { children: React.ReactN
           <Link href="/" className="flex items-center gap-3">
             <img src={projectarisLogo} alt="Projectaris" className="size-10 rounded-full border border-border/60 bg-background/80 p-1" />
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">projectaris</p>
               <p className="text-base font-semibold md:text-lg">Projectaris</p>
+              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground md:text-sm">
+                платформа конференций
+              </p>
             </div>
           </Link>
           {token ? (

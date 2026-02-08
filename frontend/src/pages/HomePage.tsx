@@ -184,10 +184,10 @@ export function HomePage() {
           <p className="text-xs text-muted-foreground">Статистика обновляется автоматически.</p>
         </div>
 
-        <Card className="relative overflow-hidden border-border/70 bg-card/90 shadow-lg animate-rise">
-          <div className="pointer-events-none absolute -right-20 -top-16 size-64 rounded-full bg-accent/40 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/20 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-background/20 to-background/50" />
+        <Card className="relative overflow-hidden border-border/70 bg-card/95 shadow-lg animate-rise">
+          <div className="pointer-events-none absolute -right-20 -top-16 size-64 rounded-full bg-accent/30 blur-3xl opacity-70" />
+          <div className="pointer-events-none absolute -bottom-24 -left-12 size-48 rounded-full bg-primary/15 blur-3xl opacity-70" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-background/10 to-background/40" />
           <CardHeader className="space-y-1 relative z-10">
             <CardTitle className="text-xl">{roleContext ? roleContext.title : "Начать работу"}</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -236,6 +236,30 @@ export function HomePage() {
           },
         ].map(item => (
           <Card key={item.title} className="border-border/70 bg-card/85">
+            <CardHeader>
+              <CardTitle className="text-lg">{item.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">{item.text}</CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="mt-16 grid gap-4 md:grid-cols-3">
+        {[
+          {
+            title: "Единый кабинет",
+            text: "Все роли работают в одном интерфейсе без дублирования данных.",
+          },
+          {
+            title: "Прозрачные этапы",
+            text: "Понятный путь от подачи проекта до финального протокола.",
+          },
+          {
+            title: "Контроль качества",
+            text: "Критерии, оценки и комментарии всегда под рукой.",
+          },
+        ].map(item => (
+          <Card key={item.title} className="border-border/70 bg-card/80">
             <CardHeader>
               <CardTitle className="text-lg">{item.title}</CardTitle>
             </CardHeader>

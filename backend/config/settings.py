@@ -31,10 +31,15 @@ def env_bool(name: str, default: str = "0") -> bool:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool("DJANGO_DEBUG", "1")
 
-ALLOWED_HOSTS = os.getenv(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1",
-).split(",")
+raw_allowed_hosts = [
+    item.strip()
+    for item in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if item.strip()
+]
+ALLOWED_HOSTS = []
+for host in raw_allowed_hosts:
+    parsed = urlparse(host)
+    ALLOWED_HOSTS.append(parsed.hostname or host)
 
 
 # Application definition
@@ -224,6 +229,15 @@ CORS_ALLOWED_ORIGINS = [
     for origin in os.getenv(
         "DJANGO_CORS_ALLOWED_ORIGINS",
         "https://projectaris.jkproduction.pro,http://localhost:26110",
+    ).split(",")
+    if origin.strip()
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "https://projectaris.jkproduction.pro,https://projectaris.jkproduction.pro:8000,http://localhost:26110",
     ).split(",")
     if origin.strip()
 ]
