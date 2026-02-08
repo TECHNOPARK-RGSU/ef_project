@@ -41,3 +41,28 @@ export async function fetchOne<T>(path: string, signal?: AbortSignal): Promise<T
   }
   return (await response.json()) as T;
 }
+
+/** Загрузка одной страницы списка (DRF PageNumberPagination). Возвращает { results, count }. */
+export async function fetchPage<T>(
+  path: string,
+  params?: { page?: number; page_size?: number; search?: string; [k: string]: string | number | undefined },
+  signal?: AbortSignal,
+): Promise<{ results: T[]; count: number }> {
+  const token = typeof window !== "undefined" ? window.localStorage.getItem("authToken") : null;
+  const headers: HeadersInit = token ? { Authorization: `Token ${token}` } : {};
+  const searchParams = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") searchParams.set(k, String(v));
+    });
+  }
+  const query = searchParams.toString();
+  const sep = path.includes("?") ? "&" : "?";
+  const url = query ? `${API_BASE_URL}${path}${sep}${query}` : `${API_BASE_URL}${path}`;
+  const response = await fetch(url, { signal, headers });
+  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+  const data = (await response.json()) as { results?: T[]; count?: number };
+  const results = Array.isArray(data.results) ? data.results : [];
+  const count = typeof data.count === "number" ? data.count : results.length;
+  return { results, count };
+}

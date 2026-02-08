@@ -22,7 +22,13 @@ function getNavItems(roleCode: string): NavItem[] {
       { label: "Мои назначения", href: "/assignments" },
     ];
   }
-  if (normalizedRole === "tutor" || isStudentRole(normalizedRole)) {
+  if (normalizedRole === "tutor") {
+    return [
+      { label: "Главная", href: "/" },
+      { label: "Мои ученики", href: "/my-students" },
+    ];
+  }
+  if (isStudentRole(normalizedRole)) {
     return [
       { label: "Главная", href: "/" },
       { label: "Конференции", href: "/conferences" },

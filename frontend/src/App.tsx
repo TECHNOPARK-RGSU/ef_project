@@ -12,6 +12,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ScoresPage } from "@/pages/ScoresPage";
+import { TutorStudentsPage } from "@/pages/TutorStudentsPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { Route, Switch, useLocation } from "wouter";
@@ -89,9 +90,10 @@ export function App() {
 
   const canAccessConferences = isOrganizer || isExpert || isTutor || isStudent;
   const defaultPath = useMemo(() => {
+    if (isTutor) return "/my-students";
     if (canAccessConferences) return "/conferences";
     return "/";
-  }, [canAccessConferences]);
+  }, [canAccessConferences, isTutor]);
 
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;
@@ -147,6 +149,7 @@ export function App() {
       ) : (
         <Switch>
           <Route path="/" component={HomePage} />
+          {isTutor ? <Route path="/my-students" component={TutorStudentsPage} /> : null}
           {canAccessConferences ? <Route path="/conferences" component={ConferencesPage} /> : null}
           {canAccessAssignments ? <Route path="/assignments" component={AssignmentsPage} /> : null}
           {canAccessAdminCatalogs ? <Route path="/conferences/:id/edit" component={ConferenceEditPage} /> : null}
