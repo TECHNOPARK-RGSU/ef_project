@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { EmptyState } from "@/components/common/EmptyState";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
@@ -153,6 +154,7 @@ export function ConferencesPage() {
   };
 
   const deleteConference = async (id: number) => {
+    if (!window.confirm("Удалить конференцию? Участники потеряют доступ к её материалам.")) return;
     setSubmitMessage(null);
     try {
       const token = getAuthToken();
@@ -191,7 +193,7 @@ export function ConferencesPage() {
               state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
             }`}
           >
-            {state === "ready" ? "данные загружены" : "нет данных"}
+            {state === "ready" ? "данные загружены" : "загрузка"}
           </span>
           {isOrganizer ? <Button onClick={handleCreateClick}>Создать</Button> : null}
         </div>
@@ -288,8 +290,17 @@ export function ConferencesPage() {
           ))
         ) : (
           <Card className="border-border/70 bg-card/80">
-            <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
-              Пока нет конференций. Создайте первую запись.
+            <CardContent className="p-6">
+              <EmptyState
+                title="Пока нет конференций"
+                description={
+                  isOrganizer
+                    ? "Создайте первую конференцию, чтобы участники могли подать заявку."
+                    : "Список конференций появится, когда организатор их добавит."
+                }
+                actionLabel={isOrganizer ? "Создать конференцию" : undefined}
+                onAction={isOrganizer ? handleCreateClick : undefined}
+              />
             </CardContent>
           </Card>
         )}
