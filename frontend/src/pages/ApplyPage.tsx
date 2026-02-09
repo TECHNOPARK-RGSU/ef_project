@@ -348,7 +348,7 @@ export function ApplyPage() {
       setIsProjectModalOpen(false);
     } catch (error) {
       setSubmitState("error");
-      setSubmitMessage("Не удалось сохранить. Проверь API.");
+      setSubmitMessage("Не удалось сохранить проект. Повторите попытку или проверьте подключение.");
     }
   };
 
@@ -424,6 +424,7 @@ export function ApplyPage() {
   };
 
   const archiveProject = async (id: number) => {
+    if (!window.confirm("Отправить проект в архив? Его нельзя будет редактировать, пока он в архиве.")) return;
     setSubmitMessage(null);
     try {
       const token = getAuthToken();
@@ -444,6 +445,7 @@ export function ApplyPage() {
   };
 
   const restoreProject = async (id: number) => {
+    if (!window.confirm("Восстановить проект из архива?")) return;
     setSubmitMessage(null);
     try {
       const token = getAuthToken();

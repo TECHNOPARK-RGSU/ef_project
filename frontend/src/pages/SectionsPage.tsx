@@ -83,7 +83,7 @@ export function SectionsPage() {
       setEditingId(null);
     } catch (error) {
       setSubmitState("error");
-      setSubmitMessage("Не удалось создать. Проверь API.");
+      setSubmitMessage("Не удалось сохранить секцию. Повторите попытку или проверьте подключение.");
     }
   };
 
@@ -102,6 +102,7 @@ export function SectionsPage() {
   };
 
   const deleteSection = async (id: number) => {
+    if (!window.confirm("Удалить секцию? Действие нельзя отменить.")) return;
     setSubmitMessage(null);
     const token = getAuthToken();
     if (!token) {

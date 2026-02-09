@@ -149,7 +149,7 @@ export function ConferencesPage() {
       setIsModalOpen(false);
     } catch (error) {
       setSubmitState("error");
-      setSubmitMessage("Не удалось создать. Проверь API.");
+      setSubmitMessage("Не удалось сохранить конференцию. Повторите попытку или проверьте подключение.");
     }
   };
 
