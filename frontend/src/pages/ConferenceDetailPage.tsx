@@ -3,17 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchList, fetchOne } from "@/lib/api";
 import { getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
-import { isStudentRole as checkStudentRole } from "@/lib/roles";
+import { useUserRole } from "@/lib/useUserRole";
 import type { Conference, EvaluationCriterion, Project, ProjectResult, Section } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 
 export function ConferenceDetailPage() {
-  const roleCode = (getAuthUserInfo()?.roleCode ?? "").toLowerCase();
-  const isOrganizer = roleCode === "organizer";
-  const isExpert = roleCode === "expert";
-  const isTutor = roleCode === "tutor";
-  const isStudent = checkStudentRole(roleCode);
+  const authUser = getAuthUserInfo();
+  const { isOrganizer, isExpert, isTutor, isStudent } = useUserRole(authUser?.roleCode);
 
   const [, params] = useRoute("/conferences/:id");
   const id = params?.id ? Number(params.id) : null;

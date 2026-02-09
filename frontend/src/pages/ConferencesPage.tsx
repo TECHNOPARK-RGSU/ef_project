@@ -7,15 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
-import { isStudentRole } from "@/lib/roles";
+import { useUserRole } from "@/lib/useUserRole";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
 export function ConferencesPage() {
-  const roleCode = (getAuthUserInfo()?.roleCode ?? "").toLowerCase();
-  const isOrganizer = roleCode === "organizer";
-  const isStudent = isStudentRole(roleCode);
+  const authUser = getAuthUserInfo();
+  const { isOrganizer, isStudent } = useUserRole(authUser?.roleCode);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [query, setQuery] = useState("");

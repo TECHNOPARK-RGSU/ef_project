@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { clearAuthToken, getAuthToken, getAuthUserInfo, setAuthUserInfo, type AuthUserInfo } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
-import { isStudentRole, normalizeRoleCode } from "@/lib/roles";
+import { useUserRole } from "@/lib/useUserRole";
 import "./index.css";
 
 export function App() {
@@ -83,26 +83,26 @@ export function App() {
     };
   }, [setLocation, token]);
 
-  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
-  const isOrganizer = roleCode === "organizer";
-  const isExpert = roleCode === "expert";
-  const isTutor = roleCode === "tutor";
-  const isStudent = isStudentRole(roleCode);
-
-  const canAccessConferences = isOrganizer || isExpert || isTutor || isStudent;
+  const {
+    roleCode,
+    isOrganizer,
+    isExpert,
+    isTutor,
+    isStudent,
+    canAccessConferences,
+    canAccessAssignments,
+    canAccessApply,
+    canAccessScores,
+    canAccessAdminCatalogs,
+    canAccessGlobalUsers,
+    canAccessCatalogs,
+  } = useUserRole(authUser?.roleCode);
   const defaultPath = useMemo(() => {
     if (isTutor) return "/my-students";
     if (isStudent) return "/my-projects";
     if (canAccessConferences) return "/conferences";
     return "/";
   }, [canAccessConferences, isStudent, isTutor]);
-
-  const canAccessAssignments = isOrganizer || isExpert;
-  const canAccessApply = isOrganizer || isTutor || isStudent;
-  const canAccessScores = isOrganizer || isExpert;
-  const canAccessAdminCatalogs = isOrganizer;
-  const canAccessGlobalUsers = false;
-  const canAccessCatalogs = false;
 
   const isAllowedPath = (path: string) => {
     if (path === "/" || path === "/login" || path === "/register") return true;

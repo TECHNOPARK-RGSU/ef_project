@@ -20,6 +20,7 @@ import type {
 } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
+import { useUserRole } from "@/lib/useUserRole";
 
 const CRITERIA_PER_PAGE = 6;
 const SECTIONS_PER_PAGE = 6;
@@ -28,6 +29,8 @@ const EXPERTS_PER_PAGE = 8;
 export function ConferenceEditPage() {
   const [, params] = useRoute("/conferences/:id/edit");
   const id = params?.id ? Number(params.id) : null;
+  const authUser = getAuthUserInfo();
+  const { isOrganizer } = useUserRole(authUser?.roleCode);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conference, setConference] = useState<Conference | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -400,7 +403,6 @@ export function ConferenceEditPage() {
     );
   }
 
-  const isOrganizer = (getAuthUserInfo()?.roleCode ?? "").toLowerCase() === "organizer";
   if (state === "ready" && !isOrganizer) {
     return (
       <Card className="border-border/70 bg-card/80">

@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
-import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
+import { normalizeRoleCode } from "@/lib/roles";
+import { useUserRole } from "@/lib/useUserRole";
 import type {
   Comment,
   Conference,
@@ -27,10 +28,8 @@ export function ApplyPage() {
   const [, paramsFromRoute] = useRoute("/conferences/:id/projects");
   const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const authUser = getAuthUserInfo();
-  const roleCode = normalizeRoleCode(authUser?.roleCode ?? "");
-  const isStudentRole = isStudentRoleCode(roleCode);
-  const isTutorRole = roleCode === "tutor";
-  const isOrganizerRole = roleCode === "organizer";
+  const roleFromAuth = normalizeRoleCode(authUser?.roleCode ?? "");
+  const { roleCode, isStudent, isTutor, isOrganizer } = useUserRole(roleFromAuth);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -176,7 +175,7 @@ export function ApplyPage() {
       if (!needle) return true;
       return project.title.toLowerCase().includes(needle);
     });
-    const roleFiltered = isOrganizerRole
+    const roleFiltered = isOrganizer
       ? filtered.filter(project => {
           if (adminSectionFilter !== "all" && String(project.section?.id) !== adminSectionFilter) return false;
           if (adminStatusFilter !== "all" && String(project.status?.id) !== adminStatusFilter) return false;
@@ -199,7 +198,7 @@ export function ApplyPage() {
     adminSectionFilter,
     adminStageFilter,
     adminStatusFilter,
-    isOrganizerRole,
+    isOrganizer,
     projects,
     projectsQuery,
     projectsSort,
@@ -262,26 +261,26 @@ export function ApplyPage() {
     form.presentationTypeId;
 
   useEffect(() => {
-    if (!isStudentRole || !authUser?.id) return;
+    if (!isStudent || !authUser?.id) return;
     if (form.leaderId) return;
     setForm(current => ({ ...current, leaderId: String(authUser.id) }));
-  }, [authUser?.id, form.leaderId, isStudentRole]);
+  }, [authUser?.id, form.leaderId, isStudent]);
 
   useEffect(() => {
-    if (isOrganizerRole || form.statusId || !statuses.length) return;
+    if (isOrganizer || form.statusId || !statuses.length) return;
     const defaultStatus =
       statuses.find(item => item.code.toLowerCase() === "new") ??
       statuses.find(item => item.code.toLowerCase() === "in_review") ??
       statuses[0];
     setForm(current => ({ ...current, statusId: String(defaultStatus.id) }));
-  }, [form.statusId, isOrganizerRole, statuses]);
+  }, [form.statusId, isOrganizer, statuses]);
 
   useEffect(() => {
-    if (isOrganizerRole || form.stageId || !stages.length) return;
+    if (isOrganizer || form.stageId || !stages.length) return;
     const defaultStage =
       stages.find(item => item.code.toLowerCase() === "qualifying") ?? stages[0];
     setForm(current => ({ ...current, stageId: String(defaultStage.id) }));
-  }, [form.stageId, isOrganizerRole, stages]);
+  }, [form.stageId, isOrganizer, stages]);
 
   const submitProject = async () => {
     setSubmitState("saving");
@@ -399,7 +398,7 @@ export function ApplyPage() {
   };
 
   const openCreateProject = () => {
-    if (isOrganizerRole) return;
+    if (isOrganizer) return;
     setEditingId(null);
     setForm({
       conferenceId: "",
@@ -518,13 +517,13 @@ export function ApplyPage() {
       <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            {isOrganizerRole ? "проекты" : "заявки"}
+            {isOrganizer ? "проекты" : "заявки"}
           </p>
           <h1 className="text-2xl font-semibold">
-            {isOrganizerRole ? "Управление проектами" : "Мои проекты"}
+            {isOrganizer ? "Управление проектами" : "Мои проекты"}
           </h1>
         </div>
-        {!isOrganizerRole ? <Button onClick={openCreateProject}>Создать проект</Button> : null}
+        {!isOrganizer ? <Button onClick={openCreateProject}>Создать проект</Button> : null}
       </div>
 
       {isProjectModalOpen ? (
@@ -536,7 +535,7 @@ export function ApplyPage() {
               {editingId ? "Редактирование заявки" : "Новая заявка"}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {isOrganizerRole
+              {isOrganizer
                 ? "Заявка сохраняется сразу в системе как проект. Отдельной отправки не требуется."
                 : "Заполните только основные поля: название, секцию, формат и файл проекта."}
             </p>
@@ -728,7 +727,7 @@ export function ApplyPage() {
               </Select>
             </div>
           </div>
-          {isOrganizerRole ? (
+          {isOrganizer ? (
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Статус</Label>
@@ -903,7 +902,7 @@ export function ApplyPage() {
               </Select>
             </div>
 
-            {isOrganizerRole ? (
+            {isOrganizer ? (
               <>
                 <div className="grid gap-2 md:grid-cols-3">
                   <Select value={adminSectionFilter} onValueChange={setAdminSectionFilter}>
@@ -1132,7 +1131,7 @@ export function ApplyPage() {
             ) : (
               <p>{archiveFilter === "archived" ? "Архив пуст." : "Проектов пока нет."}</p>
             )}
-            {!isOrganizerRole ? (
+            {!isOrganizer ? (
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-sm text-muted-foreground">
                 <span>
                   Показано {paginatedProjects.length} из {visibleProjects.length}
@@ -1163,7 +1162,7 @@ export function ApplyPage() {
             {replyMessage ? <p>{replyMessage}</p> : null}
           </CardContent>
         </Card>
-        {isOrganizerRole && visibleStatuses.length ? (
+        {isOrganizer && visibleStatuses.length ? (
           <Card className="border-border/70 bg-card/80">
             <CardHeader>
               <CardTitle className="text-lg">Статусы проектов</CardTitle>
@@ -1173,7 +1172,7 @@ export function ApplyPage() {
             </CardContent>
           </Card>
         ) : null}
-        {!isOrganizerRole ? (
+        {!isOrganizer ? (
           <>
             <Card className="border-border/70 bg-card/80">
               <CardHeader>
