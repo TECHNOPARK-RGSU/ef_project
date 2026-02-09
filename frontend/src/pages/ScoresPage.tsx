@@ -198,6 +198,7 @@ export function ScoresPage() {
   };
 
   const deleteScore = async (id: number) => {
+    if (!window.confirm("Удалить оценку? Действие нельзя будет отменить.")) return;
     setMessage(null);
     const token = getAuthToken();
     if (!token) {

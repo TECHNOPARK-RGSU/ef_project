@@ -136,7 +136,7 @@ export function SectionsPage() {
               state === "ready" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
             }`}
           >
-            {state === "ready" ? "данные загружены" : "нет данных"}
+            {state === "ready" ? "данные загружены" : "загрузка"}
           </span>
           <Button onClick={handleCreateClick}>Добавить</Button>
         </div>
