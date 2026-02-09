@@ -175,14 +175,14 @@ export function ConferencesPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            {isStudent ? "выбор конференции" : "все конференции"}
+            {isStudent ? "заявка на участие" : "все конференции"}
           </p>
           <h1 className="text-3xl font-semibold">
             {isStudent ? "Выберите конференцию" : "Каталог событий"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isStudent
-              ? "Найдите конференцию и подайте заявку на участие."
+              ? "Найдите конференцию, чтобы подать заявку со своим проектом."
               : "Список конференций с быстрым доступом к карточкам и секциям."}
           </p>
         </div>

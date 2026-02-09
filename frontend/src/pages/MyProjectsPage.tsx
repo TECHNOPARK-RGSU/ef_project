@@ -20,11 +20,13 @@ import type {
   User,
 } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 
 const PAGE_SIZE = 10;
 
 export function MyProjectsPage() {
   const authUser = getAuthUserInfo();
+  const [, setLocation] = useLocation();
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [projects, setProjects] = useState<Project[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -265,12 +267,7 @@ export function MyProjectsPage() {
             Кабинет ученика: заявки, комментарии и результаты по вашим проектам.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            // Переход к выбору конференции, где можно подать новую заявку.
-            window.location.href = "/conferences";
-          }}
-        >
+        <Button onClick={() => setLocation("/conferences")}>
           Создать проект
         </Button>
       </div>
@@ -361,20 +358,21 @@ export function MyProjectsPage() {
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {projects.map(project => (
-                    <Card key={project.id} className="border-border/60">
-                      <CardHeader className="py-3">
-                        <CardTitle className="text-base">{project.title}</CardTitle>
+                    <Card key={project.id} className="flex h-full flex-col border-border/60">
+                      <CardHeader className="flex-1 space-y-1 py-3">
+                        <CardTitle className="line-clamp-2 text-base">{project.title}</CardTitle>
                         <p className="text-xs text-muted-foreground">
                           {project.section?.name ?? "—"} · {project.section?.conference?.title ?? "—"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Руководитель: {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
+                          Руководитель:{" "}
+                          {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
                         </p>
                         {project.status && (
                           <p className="text-xs text-muted-foreground">Статус: {project.status.name}</p>
                         )}
                       </CardHeader>
-                      <CardContent className="flex flex-wrap gap-2 py-0">
+                      <CardContent className="mt-auto flex flex-wrap gap-2 py-3">
                         <Button size="sm" variant="secondary" onClick={() => openProject(project)}>
                           Открыть
                         </Button>
