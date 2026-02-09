@@ -92,9 +92,10 @@ export function App() {
   const canAccessConferences = isOrganizer || isExpert || isTutor || isStudent;
   const defaultPath = useMemo(() => {
     if (isTutor) return "/my-students";
+    if (isStudent) return "/my-projects";
     if (canAccessConferences) return "/conferences";
     return "/";
-  }, [canAccessConferences, isTutor]);
+  }, [canAccessConferences, isStudent, isTutor]);
 
   const canAccessAssignments = isOrganizer || isExpert;
   const canAccessApply = isOrganizer || isTutor || isStudent;

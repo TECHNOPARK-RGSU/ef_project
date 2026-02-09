@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
+import { isStudentRole } from "@/lib/roles";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -14,6 +15,7 @@ import { Link } from "wouter";
 export function ConferencesPage() {
   const roleCode = (getAuthUserInfo()?.roleCode ?? "").toLowerCase();
   const isOrganizer = roleCode === "organizer";
+  const isStudent = isStudentRole(roleCode);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [query, setQuery] = useState("");
@@ -172,10 +174,16 @@ export function ConferencesPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">все конференции</p>
-          <h1 className="text-3xl font-semibold">Каталог событий</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            {isStudent ? "выбор конференции" : "все конференции"}
+          </p>
+          <h1 className="text-3xl font-semibold">
+            {isStudent ? "Выберите конференцию" : "Каталог событий"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Список конференций с быстрым доступом к карточкам и секциям.
+            {isStudent
+              ? "Найдите конференцию и подайте заявку на участие."
+              : "Список конференций с быстрым доступом к карточкам и секциям."}
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -265,6 +273,11 @@ export function ConferencesPage() {
                   <Button size="sm" variant="secondary" asChild>
                     <Link href={`/conferences/${conf.id}`}>Карточка</Link>
                   </Button>
+                  {isStudent ? (
+                    <Button size="sm" asChild>
+                      <Link href={`/conferences/${conf.id}/projects`}>Подать заявку</Link>
+                    </Button>
+                  ) : null}
                   {isOrganizer ? (
                     <Button size="sm" variant="outline" onClick={() => deleteConference(conf.id)}>
                       Удалить

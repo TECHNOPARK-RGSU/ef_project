@@ -29,9 +29,10 @@ function getNavItems(roleCode: string): NavItem[] {
     ];
   }
   if (isStudentRole(normalizedRole)) {
+    // Для учеников основной рабочей вкладкой делаем «Мои проекты».
+    // Доступ к странице конференций остаётся по прямой ссылке.
     return [
       { label: "Главная", href: "/" },
-      { label: "Конференции", href: "/conferences" },
       { label: "Мои проекты", href: "/my-projects" },
     ];
   }

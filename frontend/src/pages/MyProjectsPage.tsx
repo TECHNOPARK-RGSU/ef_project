@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList, fetchPage } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
+import { formatDateRange } from "@/lib/format";
 import { isStudentRole } from "@/lib/roles";
 import type {
   Comment,
@@ -13,6 +14,7 @@ import type {
   ParticipationStage,
   PresentationType,
   Project,
+  ProjectResult,
   ProjectStatus,
   Section,
   User,
@@ -38,6 +40,7 @@ export function MyProjectsPage() {
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [results, setResults] = useState<ProjectResult[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [modalMode, setModalMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState({
@@ -103,6 +106,7 @@ export function MyProjectsPage() {
       fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(setPresentationTypes),
       fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
       fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
+      fetchList<ProjectResult>("/api/conf/results/", controller.signal).then(setResults),
     ]).catch(() => {});
     return () => controller.abort();
   }, []);
@@ -226,6 +230,21 @@ export function MyProjectsPage() {
     return sections.filter(s => s.conference?.id === section.conference?.id);
   }, [sections, sectionsForConference, form.sectionId]);
 
+  const recentComments = useMemo(() => {
+    if (!comments.length) return [];
+    // Комментарии только по проектам, которые видит ученик.
+    const projectIds = new Set(projects.map(p => p.id));
+    return comments
+      .filter(c => c.project?.id && projectIds.has(c.project.id))
+      .slice(0, 10);
+  }, [comments, projects]);
+
+  const personalResults = useMemo(() => {
+    if (!results.length || !projects.length) return [];
+    const projectIds = new Set(projects.map(p => p.id));
+    return results.filter(r => r.project?.id && projectIds.has(r.project.id));
+  }, [projects, results]);
+
   if (!authUser || !isStudentRole(authUser.roleCode)) {
     return (
       <Card className="border-border/70 bg-card/80">
@@ -238,12 +257,22 @@ export function MyProjectsPage() {
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">ученик</p>
-        <h1 className="text-3xl font-semibold">Мои проекты</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Проекты, в которых вы участвуете (руководитель или участник). Просмотр, редактирование и комментарии.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">ученик</p>
+          <h1 className="text-3xl font-semibold">Мои проекты</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Кабинет ученика: заявки, комментарии и результаты по вашим проектам.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            // Переход к выбору конференции, где можно подать новую заявку.
+            window.location.href = "/conferences";
+          }}
+        >
+          Создать проект
+        </Button>
       </div>
 
       <Card className="border-border/70 bg-card/80">
@@ -308,89 +337,150 @@ export function MyProjectsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">Проекты</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Всего: {totalCount}. Страница {page} из {totalPages}.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {state === "loading" && (
-            <p className="py-4 text-sm text-muted-foreground">Загрузка…</p>
-          )}
-          {state === "error" && (
-            <p className="py-4 text-sm text-destructive">Не удалось загрузить список.</p>
-          )}
-          {state === "ready" && projects.length === 0 && (
-            <p className="py-4 text-sm text-muted-foreground">
-              У вас пока нет проектов. Подайте заявку на конференцию в разделе «Конференции».
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.2fr)]">
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Проекты</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Всего: {totalCount}. Страница {page} из {totalPages}.
             </p>
-          )}
-          {state === "ready" && projects.length > 0 && (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map(project => (
-                  <Card key={project.id} className="border-border/60">
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-base">{project.title}</CardTitle>
-                      <p className="text-xs text-muted-foreground">
-                        {project.section?.name ?? "—"} · {project.section?.conference?.title ?? "—"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Руководитель: {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
-                      </p>
-                      {project.status && (
-                        <p className="text-xs text-muted-foreground">Статус: {project.status.name}</p>
-                      )}
-                    </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2 py-0">
-                      <Button size="sm" variant="secondary" onClick={() => openProject(project)}>
-                        Открыть
-                      </Button>
-                      {project.files ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadFile(project.id)}
-                        >
-                          Скачать
+          </CardHeader>
+          <CardContent>
+            {state === "loading" && (
+              <p className="py-4 text-sm text-muted-foreground">Загрузка…</p>
+            )}
+            {state === "error" && (
+              <p className="py-4 text-sm text-destructive">Не удалось загрузить список.</p>
+            )}
+            {state === "ready" && projects.length === 0 && (
+              <p className="py-4 text-sm text-muted-foreground">
+                У вас пока нет проектов. Нажмите «Создать проект», чтобы подать заявку на конференцию.
+              </p>
+            )}
+            {state === "ready" && projects.length > 0 && (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects.map(project => (
+                    <Card key={project.id} className="border-border/60">
+                      <CardHeader className="py-3">
+                        <CardTitle className="text-base">{project.title}</CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          {project.section?.name ?? "—"} · {project.section?.conference?.title ?? "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Руководитель: {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
+                        </p>
+                        {project.status && (
+                          <p className="text-xs text-muted-foreground">Статус: {project.status.name}</p>
+                        )}
+                      </CardHeader>
+                      <CardContent className="flex flex-wrap gap-2 py-0">
+                        <Button size="sm" variant="secondary" onClick={() => openProject(project)}>
+                          Открыть
                         </Button>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              {totalPages > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4 text-sm text-muted-foreground">
-                  <span>
-                    Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} из {totalCount}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={page <= 1}
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                    >
-                      ← Назад
-                    </Button>
-                    <span>{page} / {totalPages}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    >
-                      Вперёд →
-                    </Button>
-                  </div>
+                        {project.files ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadFile(project.id)}
+                          >
+                            Скачать
+                          </Button>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
+                {totalPages > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4 text-sm text-muted-foreground">
+                    <span>
+                      Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} из {totalCount}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={page <= 1}
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                      >
+                        ← Назад
+                      </Button>
+                      <span>{page} / {totalPages}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      >
+                        Вперёд →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">Недавние комментарии</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground max-h-64 overflow-y-auto">
+              {recentComments.length === 0 ? (
+                <p>Пока нет комментариев к вашим проектам.</p>
+              ) : (
+                recentComments.map(comment => (
+                  <div
+                    key={comment.id}
+                    className="rounded-md border border-border/60 bg-muted/30 p-2"
+                  >
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {comment.project?.title ?? "Проект"} •{" "}
+                      {comment.author
+                        ? `${comment.author.last_name ?? ""} ${comment.author.first_name ?? ""}`.trim()
+                        : "—"}
+                    </p>
+                    <p className="text-sm">{comment.text}</p>
+                  </div>
+                ))
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader>
+              <CardTitle className="text-lg">Результаты моих проектов</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground max-h-64 overflow-y-auto">
+              {personalResults.length === 0 ? (
+                <p>Результатов пока нет.</p>
+              ) : (
+                personalResults.map(result => (
+                  <div key={result.id} className="rounded-md border border-border/60 bg-muted/20 p-2">
+                    <p className="font-medium text-foreground">
+                      {result.project.title}
+                    </p>
+                    {result.project.section?.conference?.start_date &&
+                      result.project.section?.conference?.end_date ? (
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateRange(
+                          result.project.section.conference.start_date,
+                          result.project.section.conference.end_date,
+                        )}
+                      </p>
+                    ) : null}
+                    <p className="text-sm text-muted-foreground">
+                      Итог: {result.total_score} баллов, место {result.rank}
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {selectedProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
