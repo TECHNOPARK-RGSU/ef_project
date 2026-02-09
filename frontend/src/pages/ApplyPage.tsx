@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
-import { normalizeRoleCode } from "@/lib/roles";
+import { isStudentRole, normalizeRoleCode } from "@/lib/roles";
 import { useUserRole } from "@/lib/useUserRole";
 import type {
   Comment,
@@ -124,7 +124,7 @@ export function ApplyPage() {
     () =>
       users.filter(user => {
         const code = normalizeRoleCode(user.role?.code ?? "");
-        return isStudentRoleCode(code);
+        return isStudentRole(code);
       }),
     [users],
   );
@@ -589,7 +589,7 @@ export function ApplyPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Руководитель</Label>
-              {isStudentRole ? (
+              {isStudent ? (
                 <Input value={currentStudentName} disabled />
               ) : (
                 <Select
@@ -1092,7 +1092,7 @@ export function ApplyPage() {
                       ))}
                     </div>
                   ) : null}
-                  {(isStudentRole || isTutorRole) && project.status?.code === "rework" ? (
+                  {(isStudent || isTutor) && project.status?.code === "rework" ? (
                     <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/70 p-2">
                       <p className="text-xs uppercase tracking-[0.2em] text-amber-700">
                         Ответить на комментарий
@@ -1176,7 +1176,7 @@ export function ApplyPage() {
           <>
             <Card className="border-border/70 bg-card/80">
               <CardHeader>
-                <CardTitle className="text-lg">{isTutorRole ? "Кабинет наставника" : "Кабинет ученика"}</CardTitle>
+                <CardTitle className="text-lg">{isTutor ? "Кабинет наставника" : "Кабинет ученика"}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>1. Заполните заявку и прикрепите файл.</p>
