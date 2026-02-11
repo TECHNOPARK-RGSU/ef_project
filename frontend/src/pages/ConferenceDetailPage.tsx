@@ -96,7 +96,7 @@ export function ConferenceDetailPage() {
           )}
           {(isTutor || isStudent) && (
             <Button size="sm" asChild>
-              <Link href={`/conferences/${id}/projects`}>Подать заявку</Link>
+              <Link href={`/conferences/${id}/projects?create=1`}>Подать заявку</Link>
             </Button>
           )}
           {isOrganizer && (
@@ -178,7 +178,7 @@ export function ConferenceDetailPage() {
             <div className="flex flex-wrap gap-2">
               {(isTutor || isStudent) && (
                 <Button size="sm" asChild>
-                  <Link href={`/conferences/${id}/projects`}>Подать заявку</Link>
+                  <Link href={`/conferences/${id}/projects?create=1`}>Подать заявку</Link>
                 </Button>
               )}
               {isOrganizer && (

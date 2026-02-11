@@ -481,7 +481,8 @@ export function MyProjectsPage() {
       </div>
 
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
           <Card className="max-h-[90vh] w-full max-w-2xl overflow-hidden border-border/70 bg-card flex flex-col shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border/60 py-3">
               <CardTitle className="text-lg">{selectedProject.title}</CardTitle>
@@ -655,6 +656,7 @@ export function MyProjectsPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
     </section>

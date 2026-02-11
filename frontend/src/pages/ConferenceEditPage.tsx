@@ -627,13 +627,14 @@ export function ConferenceEditPage() {
       </Card>
 
       {isCriteriaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">{editingCriterionId ? "Изменить критерий" : "Новый критерий"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsCriteriaModalOpen(false)}>Закрыть</Button>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 text-sm">
               <div className="space-y-2">
                 <Label>Название</Label>
                 <Input value={criteriaForm.name} onChange={e => setCriteriaForm(c => ({ ...c, name: e.target.value }))} placeholder="Критерий" />
@@ -659,23 +660,25 @@ export function ConferenceEditPage() {
                 <Textarea value={criteriaForm.description} onChange={e => setCriteriaForm(c => ({ ...c, description: e.target.value }))} placeholder="Описание" rows={2} />
               </div>
               {criteriaMessage && <p className="text-destructive">{criteriaMessage}</p>}
-              <div className="flex gap-2">
-                <Button onClick={submitCriterion}>{editingCriterionId ? "Сохранить" : "Добавить"}</Button>
-                <Button variant="outline" onClick={() => setIsCriteriaModalOpen(false)}>Отмена</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="w-full sm:w-auto" onClick={submitCriterion}>{editingCriterionId ? "Сохранить" : "Добавить"}</Button>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={() => setIsCriteriaModalOpen(false)}>Отмена</Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
 
       {isSectionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">Добавить секцию</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsSectionModalOpen(false)}>Закрыть</Button>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 text-sm">
               <div className="space-y-2">
                 <Label>Название</Label>
                 <Input value={sectionForm.name} onChange={e => setSectionForm(s => ({ ...s, name: e.target.value }))} placeholder="Секция" />
@@ -690,23 +693,25 @@ export function ConferenceEditPage() {
                 </Select>
               </div>
               {sectionMessage && <p className="text-destructive">{sectionMessage}</p>}
-              <div className="flex gap-2">
-                <Button onClick={submitSection}>Добавить</Button>
-                <Button variant="outline" onClick={() => setIsSectionModalOpen(false)}>Отмена</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="w-full sm:w-auto" onClick={submitSection}>Добавить</Button>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={() => setIsSectionModalOpen(false)}>Отмена</Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
 
       {isExpertModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">{editingExpertId ? "Настроить эксперта" : "Добавить эксперта"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setIsExpertModalOpen(false)}>Закрыть</Button>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 text-sm">
               <div className="space-y-2">
                 <Label>Эксперт</Label>
                 <Select value={expertForm.expertId || undefined} onValueChange={v => setExpertForm(e => ({ ...e, expertId: v }))}>
@@ -740,18 +745,20 @@ export function ConferenceEditPage() {
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={saveExpert} disabled={!expertForm.expertId}>{editingExpertId ? "Сохранить" : "Добавить"}</Button>
-                <Button variant="outline" onClick={() => setIsExpertModalOpen(false)}>Отмена</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="w-full sm:w-auto" onClick={saveExpert} disabled={!expertForm.expertId}>{editingExpertId ? "Сохранить" : "Добавить"}</Button>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={() => setIsExpertModalOpen(false)}>Отмена</Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
 
       {catalogModalType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-md border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <CardTitle className="text-lg">
                 {catalogModalType === "age" && "Возрастная категория"}
@@ -762,7 +769,7 @@ export function ConferenceEditPage() {
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => { setCatalogModalType(null); setCatalogMessage(null); }}>Закрыть</Button>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3 text-sm">
               {(catalogModalType === "age" || catalogModalType === "status" || catalogModalType === "stage" || catalogModalType === "place" || catalogModalType === "presentation") && (
                 <div className="space-y-2">
                   <Label>Название</Label>
@@ -807,12 +814,13 @@ export function ConferenceEditPage() {
                 </div>
               )}
               {catalogMessage && <p className="text-destructive text-xs">{catalogMessage}</p>}
-              <div className="flex gap-2">
-                <Button onClick={submitCatalogItem}>Добавить</Button>
-                <Button variant="outline" onClick={() => { setCatalogModalType(null); setCatalogMessage(null); }}>Отмена</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="w-full sm:w-auto" onClick={submitCatalogItem}>Добавить</Button>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={() => { setCatalogModalType(null); setCatalogMessage(null); }}>Отмена</Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
     </section>

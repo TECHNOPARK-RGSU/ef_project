@@ -161,12 +161,13 @@ export function CriteriaPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">критерии</p>
           <h1 className="text-3xl font-semibold">Критерии оценки</h1>
         </div>
-        <Button onClick={openCreateCriterion}>Создать критерий</Button>
+        <Button className="w-full sm:w-auto" onClick={openCreateCriterion}>Создать критерий</Button>
       </div>
 
       {isCriteriaModalOpen ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <Card className="w-full max-w-4xl border-border/70 bg-card shadow-xl">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+      <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+      <Card className="w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">
@@ -177,7 +178,7 @@ export function CriteriaPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
           <div className="space-y-2">
             <Label>Конференция</Label>
             <Select
@@ -251,11 +252,11 @@ export function CriteriaPage() {
               onChange={e => setForm({ ...form, description: e.target.value })}
             />
           </div>
-          <div className="flex items-end">
-            <div className="flex items-center gap-2">
-              <Button onClick={submitCriterion}>{editingId ? "Сохранить" : "Создать"}</Button>
+          <div className="flex items-end md:col-span-3">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <Button className="w-full sm:w-auto" onClick={submitCriterion}>{editingId ? "Сохранить" : "Создать"}</Button>
               {editingId ? (
-                <Button variant="outline" onClick={cancelEdit}>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={cancelEdit}>
                   Отмена
                 </Button>
               ) : null}
@@ -264,6 +265,7 @@ export function CriteriaPage() {
           {message ? <p className="col-span-full">{message}</p> : null}
         </CardContent>
       </Card>
+      </div>
       </div>
       ) : null}
 

@@ -465,7 +465,46 @@ export function AssignmentsPage() {
                 <CardContent className="py-0">
                   {items.length ? (
                     <>
-                      <div className="overflow-x-auto">
+                      <div className="space-y-2 py-2 md:hidden">
+                        {paginatedItems.map((item, idx) => (
+                          <div key={item.id} className="rounded-md border border-border/60 bg-background/70 p-3 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium">{start + idx + 1}. {item.project.title}</p>
+                              {assignment.stage === "offline" ? (
+                                <span className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                                  {item.place?.name || "—"}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground">Секция: {item.project.section?.name || "—"}</p>
+                            {(isExpertRole || isOrganizerRole) ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.project.files ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs"
+                                    onClick={() => downloadProjectFile(item.project.id)}
+                                  >
+                                    Скачать
+                                  </Button>
+                                ) : null}
+                                {isExpertRole ? (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-8 text-xs"
+                                    onClick={() => openScoreModal(item, assignment)}
+                                  >
+                                    Оценить
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
@@ -584,8 +623,9 @@ export function AssignmentsPage() {
       </div>
 
       {scoreModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-lg border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] border-border/70 bg-card shadow-xl">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-lg">Оценка: {scoreModal.projectTitle}</CardTitle>
@@ -594,21 +634,21 @@ export function AssignmentsPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 overflow-y-auto pr-1">
               {criteriaForAssignment(scoreModal.assignment).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Нет критериев для этого этапа конференции.</p>
               ) : (
                 <div className="grid gap-3 text-sm">
                   {criteriaForAssignment(scoreModal.assignment).map(c => (
-                    <div key={c.id} className="flex items-center gap-3">
-                      <Label className="min-w-[140px] shrink-0">
+                    <div key={c.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <Label className="text-xs sm:min-w-[140px] sm:shrink-0 sm:text-sm">
                         {c.name} (макс. {c.max_score})
                       </Label>
                       <Input
                         type="number"
                         min={0}
                         max={c.max_score}
-                        className="w-24"
+                        className="w-full sm:w-24"
                         value={scoreForm[c.id] ?? ""}
                         onChange={e => setScoreForm(f => ({ ...f, [c.id]: e.target.value }))}
                       />
@@ -627,8 +667,9 @@ export function AssignmentsPage() {
                 />
               </div>
               {scoreMessage ? <p className="text-sm text-muted-foreground">{scoreMessage}</p> : null}
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
+                  className="w-full sm:w-auto"
                   onClick={saveScores}
                   disabled={
                     criteriaForAssignment(scoreModal.assignment).length === 0 && !scoreComment.trim()
@@ -636,12 +677,13 @@ export function AssignmentsPage() {
                 >
                   Сохранить оценки и комментарий
                 </Button>
-                <Button variant="outline" onClick={() => setScoreModal(null)}>
+                <Button className="w-full sm:w-auto" variant="outline" onClick={() => setScoreModal(null)}>
                   Отмена
                 </Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       ) : null}
     </section>

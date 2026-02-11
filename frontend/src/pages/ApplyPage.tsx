@@ -22,11 +22,13 @@ import type {
   User,
 } from "@/lib/types";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 
 export function ApplyPage() {
   const [, paramsFromRoute] = useRoute("/conferences/:id/projects");
+  const [location] = useLocation();
   const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
+  const defaultConferenceId = conferenceIdFromRoute != null ? String(conferenceIdFromRoute) : "";
   const authUser = getAuthUserInfo();
   const roleFromAuth = normalizeRoleCode(authUser?.roleCode ?? "");
   const { roleCode, isStudent, isTutor, isOrganizer } = useUserRole(roleFromAuth);
@@ -61,8 +63,9 @@ export function ApplyPage() {
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [autoCreateHandled, setAutoCreateHandled] = useState(false);
   const [form, setForm] = useState({
-    conferenceId: "",
+    conferenceId: defaultConferenceId,
     title: "",
     description: "",
     additionalInfo: "",
@@ -75,6 +78,13 @@ export function ApplyPage() {
     stageId: "",
     presentationTypeId: "",
   });
+  useEffect(() => {
+    if (conferenceIdFromRoute == null) return;
+    setForm(current => {
+      if (current.conferenceId === String(conferenceIdFromRoute)) return current;
+      return { ...current, conferenceId: String(conferenceIdFromRoute), sectionId: "" };
+    });
+  }, [conferenceIdFromRoute]);
 
   const conferenceQuery = conferenceIdFromRoute != null ? `?conference=${conferenceIdFromRoute}` : "";
 
@@ -157,6 +167,18 @@ export function ApplyPage() {
     if (!currentStudent) return "Текущий пользователь";
     return `${currentStudent.last_name ?? ""} ${currentStudent.first_name ?? ""}`.trim();
   }, [authUser?.id, studentUsers]);
+  const conferenceTitleFromRoute = useMemo(() => {
+    if (conferenceIdFromRoute == null) return "";
+    return conferences.find(conf => conf.id === conferenceIdFromRoute)?.title ?? `Конференция #${conferenceIdFromRoute}`;
+  }, [conferenceIdFromRoute, conferences]);
+  const shouldAutoOpenCreate = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const value = (new URLSearchParams(window.location.search).get("create") ?? "").toLowerCase();
+    return value === "1" || value === "true" || value === "yes";
+  }, [location]);
+  useEffect(() => {
+    setAutoCreateHandled(false);
+  }, [location]);
   const commentsByProject = useMemo(() => {
     return comments.reduce<Record<number, Comment[]>>((acc, item) => {
       const projectId = item.project?.id;
@@ -283,8 +305,19 @@ export function ApplyPage() {
   }, [form.stageId, isOrganizer, stages]);
 
   const submitProject = async () => {
-    setSubmitState("saving");
     setSubmitMessage(null);
+    const selectedMembers = [form.member1Id, form.member2Id].filter(value => value && value !== "none");
+    if (new Set(selectedMembers).size !== selectedMembers.length) {
+      setSubmitState("error");
+      setSubmitMessage("Участники 2 и 3 должны быть разными.");
+      return;
+    }
+    if (selectedMembers.includes(form.leaderId)) {
+      setSubmitState("error");
+      setSubmitMessage("Руководитель не должен дублироваться в участниках.");
+      return;
+    }
+    setSubmitState("saving");
     try {
       const token = getAuthToken();
       if (!token) throw new Error("missing token");
@@ -318,7 +351,25 @@ export function ApplyPage() {
         headers: { Authorization: `Token ${token}` },
         body,
       });
-      if (!response.ok) throw new Error("save failed");
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+        let message = "Не удалось сохранить проект.";
+        if (data) {
+          if (typeof data.detail === "string") {
+            message = data.detail;
+          } else {
+            const fields = Object.entries(data)
+              .map(([field, value]) => {
+                if (Array.isArray(value)) return `${field}: ${value.join(", ")}`;
+                if (typeof value === "string") return `${field}: ${value}`;
+                return null;
+              })
+              .filter((part): part is string => Boolean(part));
+            if (fields.length) message = fields.join(" ");
+          }
+        }
+        throw new Error(message);
+      }
       const created = (await response.json()) as Project;
       setProjects(current =>
         editingId ? current.map(item => (item.id === editingId ? created : item)) : [created, ...current],
@@ -326,11 +377,11 @@ export function ApplyPage() {
       setSubmitState("saved");
       setSubmitMessage(editingId ? "Проект обновлен." : "Проект сохранен.");
       setForm({
-        conferenceId: "",
+        conferenceId: defaultConferenceId,
         title: "",
         description: "",
         additionalInfo: "",
-        leaderId: "",
+        leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
         tutorId: "none",
         member1Id: "none",
         member2Id: "none",
@@ -347,7 +398,7 @@ export function ApplyPage() {
       setIsProjectModalOpen(false);
     } catch (error) {
       setSubmitState("error");
-      setSubmitMessage("Не удалось сохранить проект. Повторите попытку или проверьте подключение.");
+      setSubmitMessage(error instanceof Error ? error.message : "Не удалось сохранить проект.");
     }
   };
 
@@ -376,12 +427,14 @@ export function ApplyPage() {
 
   const cancelEdit = () => {
     setEditingId(null);
+    setSubmitState("idle");
+    setSubmitMessage(null);
     setForm({
-      conferenceId: "",
+      conferenceId: defaultConferenceId,
       title: "",
       description: "",
       additionalInfo: "",
-      leaderId: "",
+      leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
       tutorId: "none",
       member1Id: "none",
       member2Id: "none",
@@ -400,12 +453,13 @@ export function ApplyPage() {
   const openCreateProject = () => {
     if (isOrganizer) return;
     setEditingId(null);
+    setSubmitState("idle");
     setForm({
-      conferenceId: "",
+      conferenceId: defaultConferenceId,
       title: "",
       description: "",
       additionalInfo: "",
-      leaderId: "",
+      leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
       tutorId: "none",
       member1Id: "none",
       member2Id: "none",
@@ -421,6 +475,12 @@ export function ApplyPage() {
     setSubmitMessage(null);
     setIsProjectModalOpen(true);
   };
+
+  useEffect(() => {
+    if (isOrganizerRole || autoCreateHandled || !shouldAutoOpenCreate) return;
+    openCreateProject();
+    setAutoCreateHandled(true);
+  }, [autoCreateHandled, isOrganizerRole, openCreateProject, shouldAutoOpenCreate]);
 
   const archiveProject = async (id: number) => {
     if (!window.confirm("Отправить проект в архив? Его нельзя будет редактировать, пока он в архиве.")) return;
@@ -523,12 +583,13 @@ export function ApplyPage() {
             {isOrganizer ? "Управление проектами" : "Мои проекты"}
           </h1>
         </div>
-        {!isOrganizer ? <Button onClick={openCreateProject}>Создать проект</Button> : null}
+        {!isOrganizer ? <Button className="w-full sm:w-auto" onClick={openCreateProject}>Создать проект</Button> : null}
       </div>
 
       {isProjectModalOpen ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <Card className="w-full max-w-4xl border-border/70 bg-card shadow-xl">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+      <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+      <Card className="w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] border-border/70 bg-card shadow-xl">
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <CardTitle className="text-2xl">
@@ -544,7 +605,7 @@ export function ApplyPage() {
             Закрыть
           </Button>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-5 overflow-y-auto pr-1">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="project">Название проекта</Label>
@@ -557,33 +618,37 @@ export function ApplyPage() {
             </div>
             <div className="space-y-2">
               <Label>Конференция</Label>
-              <Select
-                value={form.conferenceId || undefined}
-                onValueChange={value =>
-                  setForm(current => ({
-                    ...current,
-                    conferenceId: value,
-                    sectionId: "",
-                  }))
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Выберите конференцию" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conferences.length ? (
-                    conferences.map(conf => (
-                      <SelectItem key={conf.id} value={String(conf.id)}>
-                        {conf.title}
+              {conferenceIdFromRoute != null ? (
+                <Input value={conferenceTitleFromRoute} disabled />
+              ) : (
+                <Select
+                  value={form.conferenceId || undefined}
+                  onValueChange={value =>
+                    setForm(current => ({
+                      ...current,
+                      conferenceId: value,
+                      sectionId: "",
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите конференцию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {conferences.length ? (
+                      conferences.map(conf => (
+                        <SelectItem key={conf.id} value={String(conf.id)}>
+                          {conf.title}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="0" disabled>
+                        Нет конференций
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="0" disabled>
-                      Нет конференций
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -824,7 +889,7 @@ export function ApplyPage() {
                   : "Сохранить проект"}
             </Button>
             {editingId ? (
-              <Button variant="outline" onClick={cancelEdit}>
+              <Button variant="outline" className="w-full md:w-auto" onClick={cancelEdit}>
                 Отмена
               </Button>
             ) : null}
@@ -832,11 +897,12 @@ export function ApplyPage() {
         </CardContent>
       </Card>
       </div>
+      </div>
       ) : null}
 
       <div className="space-y-4">
         <Card className="border-border/70 bg-card/80">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <CardTitle className="text-lg">Проекты</CardTitle>
               {conferenceIdFromRoute != null ? (

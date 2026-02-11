@@ -235,6 +235,16 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# Security defaults for production. Local development remains unchanged when DEBUG=True.
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", "0" if DEBUG else "1")
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", "0" if DEBUG else "1")
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", "0" if DEBUG else "1")
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "0" if DEBUG else "1"
+)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", "0" if DEBUG else "1")
+
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(

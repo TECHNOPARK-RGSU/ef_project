@@ -328,8 +328,9 @@ export function ConferencesPage() {
       </div>
 
       {isOrganizer && isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-3xl border-border/70 bg-card shadow-xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+          <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+          <Card className="w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-lg">
@@ -343,7 +344,7 @@ export function ConferencesPage() {
                 Закрыть
               </Button>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4 text-sm text-muted-foreground">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="conf-title">Название</Label>
@@ -431,12 +432,13 @@ export function ConferencesPage() {
                 <Button className="w-full md:w-auto" disabled={!canSubmit || submitState === "saving"} onClick={submitConference}>
                   {submitState === "saving" ? "Сохраняем…" : "Создать конференцию"}
                 </Button>
-                <Button variant="outline" onClick={closeModal}>
+                <Button className="w-full md:w-auto" variant="outline" onClick={closeModal}>
                   Отмена
                 </Button>
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       ) : null}
     </section>

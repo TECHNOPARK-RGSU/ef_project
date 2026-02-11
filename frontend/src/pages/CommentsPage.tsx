@@ -159,19 +159,20 @@ export function CommentsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">комментарии</p>
           <h1 className="text-3xl font-semibold">Комментарии экспертов</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
           {conferenceIdFromRoute != null ? (
             <Button variant="outline" asChild>
               <Link href={`/conferences/${conferenceIdFromRoute}`}>← К конференции</Link>
             </Button>
           ) : null}
-          <Button onClick={openCreateComment}>Создать комментарий</Button>
+          <Button className="w-full sm:w-auto" onClick={openCreateComment}>Создать комментарий</Button>
         </div>
       </div>
 
       {isCommentModalOpen ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <Card className="w-full max-w-3xl border-border/70 bg-card shadow-xl">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
+      <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
+      <Card className="w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] border-border/70 bg-card shadow-xl">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-lg">
@@ -182,7 +183,7 @@ export function CommentsPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 text-sm text-muted-foreground">
+        <CardContent className="grid gap-4 overflow-y-auto pr-1 text-sm text-muted-foreground md:grid-cols-3">
           <div className="space-y-2">
             <Label>Проект</Label>
             <Select value={form.projectId || undefined} onValueChange={value => setForm({ ...form, projectId: value })}>
@@ -224,17 +225,20 @@ export function CommentsPage() {
               className="min-h-[120px]"
             />
           </div>
-          <div className="flex items-end gap-2">
-            <Button onClick={submitComment}>{editingId ? "Сохранить" : "Создать"}</Button>
+          <div className="flex items-end gap-2 md:col-span-3">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Button className="w-full sm:w-auto" onClick={submitComment}>{editingId ? "Сохранить" : "Создать"}</Button>
             {editingId ? (
-              <Button variant="outline" onClick={cancelEdit}>
+              <Button className="w-full sm:w-auto" variant="outline" onClick={cancelEdit}>
                 Отмена
               </Button>
             ) : null}
+            </div>
           </div>
           {message ? <p className="col-span-full">{message}</p> : null}
         </CardContent>
       </Card>
+      </div>
       </div>
       ) : null}
 
