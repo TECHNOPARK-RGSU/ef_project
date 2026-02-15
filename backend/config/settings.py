@@ -235,8 +235,13 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
-# Security defaults for production. Local development remains unchanged when DEBUG=True.
-SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", "0" if DEBUG else "1")
+# Security defaults for production.
+# NOTE: many deployments terminate TLS at an external proxy/load balancer and forward
+# plain HTTP to Django. Without proper forwarded proto handling this can cause
+# infinite redirect loops on HTTPS endpoints.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = env_bool("DJANGO_USE_X_FORWARDED_HOST", "0" if DEBUG else "1")
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", "0")
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", "0" if DEBUG else "1")
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", "0" if DEBUG else "1")
 SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
