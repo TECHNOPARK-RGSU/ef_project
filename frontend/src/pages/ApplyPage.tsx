@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
-import { isStudentRole, normalizeRoleCode } from "@/lib/roles";
+import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
 import { useUserRole } from "@/lib/useUserRole";
 import type {
   Comment,
@@ -134,7 +134,7 @@ export function ApplyPage() {
     () =>
       users.filter(user => {
         const code = normalizeRoleCode(user.role?.code ?? "");
-        return isStudentRole(code);
+        return isStudentRoleCode(code);
       }),
     [users],
   );
@@ -381,7 +381,7 @@ export function ApplyPage() {
         title: "",
         description: "",
         additionalInfo: "",
-        leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
+        leaderId: isStudent && authUser?.id ? String(authUser.id) : "",
         tutorId: "none",
         member1Id: "none",
         member2Id: "none",
@@ -434,7 +434,7 @@ export function ApplyPage() {
       title: "",
       description: "",
       additionalInfo: "",
-      leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
+      leaderId: isStudent && authUser?.id ? String(authUser.id) : "",
       tutorId: "none",
       member1Id: "none",
       member2Id: "none",
@@ -459,7 +459,7 @@ export function ApplyPage() {
       title: "",
       description: "",
       additionalInfo: "",
-      leaderId: isStudentRole && authUser?.id ? String(authUser.id) : "",
+      leaderId: isStudent && authUser?.id ? String(authUser.id) : "",
       tutorId: "none",
       member1Id: "none",
       member2Id: "none",
@@ -477,10 +477,10 @@ export function ApplyPage() {
   };
 
   useEffect(() => {
-    if (isOrganizerRole || autoCreateHandled || !shouldAutoOpenCreate) return;
+    if (isOrganizer || autoCreateHandled || !shouldAutoOpenCreate) return;
     openCreateProject();
     setAutoCreateHandled(true);
-  }, [autoCreateHandled, isOrganizerRole, openCreateProject, shouldAutoOpenCreate]);
+  }, [autoCreateHandled, isOrganizer, openCreateProject, shouldAutoOpenCreate]);
 
   const archiveProject = async (id: number) => {
     if (!window.confirm("Отправить проект в архив? Его нельзя будет редактировать, пока он в архиве.")) return;
