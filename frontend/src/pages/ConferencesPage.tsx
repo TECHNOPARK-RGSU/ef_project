@@ -276,7 +276,7 @@ export function ConferencesPage() {
                   </Button>
                   {isStudent ? (
                     <Button size="sm" asChild>
-                      <Link href={`/conferences/${conf.id}/projects`}>Подать заявку</Link>
+                      <Link href={`/conferences/${conf.id}/projects?create=1`}>Подать заявку</Link>
                     </Button>
                   ) : null}
                   {isOrganizer ? (
