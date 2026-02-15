@@ -12,6 +12,11 @@ export const API_BASE_URL = (() => {
   return `${protocol}//${host}:8000`;
 })();
 
+const withCacheBust = (url: string): string => {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}_=${Date.now()}`;
+};
+
 export const toList = <T,>(data: unknown): T[] => {
   if (Array.isArray(data)) return data as T[];
   if (data && typeof data === "object" && "results" in data) {
@@ -24,7 +29,7 @@ export const toList = <T,>(data: unknown): T[] => {
 export async function fetchList<T>(path: string, signal?: AbortSignal): Promise<T[]> {
   const token = typeof window !== "undefined" ? window.localStorage.getItem("authToken") : null;
   const headers: HeadersInit = token ? { Authorization: `Token ${token}` } : {};
-  const response = await fetch(`${API_BASE_URL}${path}`, { signal, headers });
+  const response = await fetch(withCacheBust(`${API_BASE_URL}${path}`), { signal, headers, cache: "no-store" });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }
@@ -35,7 +40,7 @@ export async function fetchList<T>(path: string, signal?: AbortSignal): Promise<
 export async function fetchOne<T>(path: string, signal?: AbortSignal): Promise<T | null> {
   const token = typeof window !== "undefined" ? window.localStorage.getItem("authToken") : null;
   const headers: HeadersInit = token ? { Authorization: `Token ${token}` } : {};
-  const response = await fetch(`${API_BASE_URL}${path}`, { signal, headers });
+  const response = await fetch(withCacheBust(`${API_BASE_URL}${path}`), { signal, headers, cache: "no-store" });
   if (!response.ok) {
     return null;
   }
@@ -59,7 +64,7 @@ export async function fetchPage<T>(
   const query = searchParams.toString();
   const sep = path.includes("?") ? "&" : "?";
   const url = query ? `${API_BASE_URL}${path}${sep}${query}` : `${API_BASE_URL}${path}`;
-  const response = await fetch(url, { signal, headers });
+  const response = await fetch(withCacheBust(url), { signal, headers, cache: "no-store" });
   if (!response.ok) throw new Error(`API request failed: ${response.status}`);
   const data = (await response.json()) as { results?: T[]; count?: number };
   const results = Array.isArray(data.results) ? data.results : [];
