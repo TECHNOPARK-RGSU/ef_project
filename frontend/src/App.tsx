@@ -42,7 +42,9 @@ export function App() {
     const loadUser = async () => {
       try {
         setAuthState("loading");
-        const response = await fetch(`${API_BASE_URL}/api/users/me/`, {
+        const meUrl = `${API_BASE_URL}/api/users/me/?_=${Date.now()}`;
+        const response = await fetch(meUrl, {
+          cache: "no-store",
           headers: { Authorization: `Token ${token}` },
         });
         if (!active) return;
