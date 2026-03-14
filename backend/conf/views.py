@@ -588,17 +588,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 expert_assignments__assignment__expert=user
             ).distinct()
         if role_code == "tutor":
-            return queryset.filter(
-                Q(tutor=user)
-                | Q(
-                    leader__available_tutor_links__tutor=user,
-                    leader__available_tutor_links__is_archived=False,
-                )
-                | Q(
-                    members__available_tutor_links__tutor=user,
-                    members__available_tutor_links__is_archived=False,
-                )
-            ).distinct()
+            return queryset.filter(tutor=user)
         if is_student_role(role_code):
             return queryset.filter(Q(leader=user) | Q(members=user)).distinct()
         return queryset.none()
@@ -655,18 +645,7 @@ class CommentViewSet(viewsets.ModelViewSet):
                 Q(author=user) | Q(project__expert_assignments__assignment__expert=user)
             ).distinct()
         if role_code == "tutor":
-            return queryset.filter(
-                Q(author=user)
-                | Q(project__tutor=user)
-                | Q(
-                    project__leader__available_tutor_links__tutor=user,
-                    project__leader__available_tutor_links__is_archived=False,
-                )
-                | Q(
-                    project__members__available_tutor_links__tutor=user,
-                    project__members__available_tutor_links__is_archived=False,
-                )
-            ).distinct()
+            return queryset.filter(Q(author=user) | Q(project__tutor=user)).distinct()
         if is_student_role(role_code):
             return queryset.filter(
                 Q(project__leader=user) | Q(project__members=user)
@@ -686,14 +665,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         if role_code == "expert":
             allowed = project.expert_assignments.filter(assignment__expert=user).exists()
         elif role_code == "tutor":
-            allowed = (
-                project.tutor_id == user.id
-                or project.leader.available_tutor_links.filter(tutor=user, is_archived=False).exists()
-                or project.members.filter(
-                    available_tutor_links__tutor=user,
-                    available_tutor_links__is_archived=False,
-                ).exists()
-            )
+            allowed = project.tutor_id == user.id
         elif is_student_role(role_code):
             allowed = project.leader_id == user.id or project.members.filter(id=user.id).exists()
 
@@ -779,17 +751,7 @@ class ProjectScoreViewSet(viewsets.ModelViewSet):
         if role_code == "expert":
             return queryset.filter(evaluator=user)
         if role_code == "tutor":
-            return queryset.filter(
-                Q(project__tutor=user)
-                | Q(
-                    project__leader__available_tutor_links__tutor=user,
-                    project__leader__available_tutor_links__is_archived=False,
-                )
-                | Q(
-                    project__members__available_tutor_links__tutor=user,
-                    project__members__available_tutor_links__is_archived=False,
-                )
-            ).distinct()
+            return queryset.filter(project__tutor=user)
         if is_student_role(role_code):
             return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
         return queryset.none()
@@ -824,17 +786,7 @@ class ProjectResultViewSet(viewsets.ReadOnlyModelViewSet):
         if role_code in {"organizer", "expert"}:
             return queryset
         if role_code == "tutor":
-            return queryset.filter(
-                Q(project__tutor=user)
-                | Q(
-                    project__leader__available_tutor_links__tutor=user,
-                    project__leader__available_tutor_links__is_archived=False,
-                )
-                | Q(
-                    project__members__available_tutor_links__tutor=user,
-                    project__members__available_tutor_links__is_archived=False,
-                )
-            ).distinct()
+            return queryset.filter(project__tutor=user)
         if is_student_role(role_code):
             return queryset.filter(Q(project__leader=user) | Q(project__members=user)).distinct()
         return queryset.none()

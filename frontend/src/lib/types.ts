@@ -103,9 +103,6 @@ export type User = {
   city?: string | null;
   role?: Role | null;
   educational_organization?: EducationalOrganization | null;
-  allowed_student_ids?: number[];
-  scientific_supervisor_id?: number | null;
-  peer_student_ids?: number[];
 };
 
 export type EvaluationCriterion = {

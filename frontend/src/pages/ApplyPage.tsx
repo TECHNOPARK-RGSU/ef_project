@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { API_BASE_URL, fetchList, fetchOne } from "@/lib/api";
+import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
 import { isStudentRole as isStudentRoleCode, normalizeRoleCode } from "@/lib/roles";
@@ -54,17 +54,13 @@ export function ApplyPage() {
   const [conferenceFilter, setConferenceFilter] = useState("all");
   useEffect(() => {
     if (conferenceIdFromRoute != null) setConferenceFilter(String(conferenceIdFromRoute));
-  }, [conferenceIdFromRoute, isStudent]);
+  }, [conferenceIdFromRoute]);
   const [adminSectionFilter, setAdminSectionFilter] = useState("all");
   const [adminStatusFilter, setAdminStatusFilter] = useState("all");
   const [adminStageFilter, setAdminStageFilter] = useState("all");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
-  const [peerStudents, setPeerStudents] = useState<User[]>([]);
-  const [peerEmailInput, setPeerEmailInput] = useState("");
-  const [peerMessage, setPeerMessage] = useState<string | null>(null);
-  const [savingPeers, setSavingPeers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [autoCreateHandled, setAutoCreateHandled] = useState(false);
@@ -111,12 +107,6 @@ export function ApplyPage() {
         fetchList<Project>("/api/conf/projects/?include_archived=1", controller.signal).then(setProjects),
         fetchList<ProjectResult>("/api/conf/results/", controller.signal).then(setResults),
         fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
-        isStudent
-          ? fetchOne<{ student_emails?: string[]; students?: User[] }>("/api/users/users/my-peer-students/", controller.signal).then(data => {
-              setPeerStudents(data?.students ?? []);
-              setPeerEmailInput((data?.student_emails ?? []).join("\n"));
-            })
-          : Promise.resolve(null),
       ];
       const results = await Promise.allSettled(requests);
       if (!controller.signal.aborted) {
@@ -152,28 +142,6 @@ export function ApplyPage() {
     () => users.filter(user => (user.role?.code ?? "").toLowerCase() === "tutor"),
     [users],
   );
-  const selectedLeaderId = useMemo(() => {
-    if (form.leaderId) return Number(form.leaderId);
-    if (isStudent && authUser?.id) return authUser.id;
-    return null;
-  }, [authUser?.id, form.leaderId, isStudent]);
-  const availableTutorUsers = useMemo(() => {
-    if (!selectedLeaderId) return tutorUsers;
-    return tutorUsers.filter(user => (user.allowed_student_ids ?? []).includes(selectedLeaderId));
-  }, [selectedLeaderId, tutorUsers]);
-  const currentSupervisorUser = useMemo(() => {
-    if (!isStudent || !authUser?.id) return null;
-    return (
-      tutorUsers.find(user => (user.allowed_student_ids ?? []).includes(authUser.id))
-      ?? null
-    );
-  }, [authUser?.id, isStudent, tutorUsers]);
-  const availableMemberUsers = useMemo(() => {
-    const blockedIds = new Set<number>();
-    if (authUser?.id) blockedIds.add(authUser.id);
-    if (form.leaderId) blockedIds.add(Number(form.leaderId));
-    return studentUsers.filter(user => !blockedIds.has(user.id));
-  }, [authUser?.id, form.leaderId, studentUsers]);
   const availableSections = useMemo(() => {
     if (!form.conferenceId) return [];
     return sections.filter(section => String(section.conference?.id) === form.conferenceId);
@@ -335,59 +303,6 @@ export function ApplyPage() {
       stages.find(item => item.code.toLowerCase() === "qualifying") ?? stages[0];
     setForm(current => ({ ...current, stageId: String(defaultStage.id) }));
   }, [form.stageId, isOrganizer, stages]);
-
-  useEffect(() => {
-    if (form.tutorId === "none") return;
-    if (availableTutorUsers.some(user => String(user.id) === form.tutorId)) return;
-    setForm(current => ({ ...current, tutorId: "none" }));
-  }, [availableTutorUsers, form.tutorId]);
-
-  useEffect(() => {
-    if (!isStudent || !currentSupervisorUser) return;
-    if (form.tutorId !== "none") return;
-    setForm(current => ({ ...current, tutorId: String(currentSupervisorUser.id) }));
-  }, [currentSupervisorUser, form.tutorId, isStudent]);
-
-  const savePeerStudents = async () => {
-    const token = getAuthToken();
-    if (!token) {
-      setPeerMessage("Нужна авторизация.");
-      return;
-    }
-    const emails = Array.from(
-      new Set(
-        peerEmailInput
-          .split(/[\n,;]+/)
-          .map(value => value.trim().toLowerCase())
-          .filter(Boolean),
-      ),
-    );
-    setSavingPeers(true);
-    setPeerMessage(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/users/users/my-peer-students/`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-        body: JSON.stringify({ emails }),
-      });
-      const data = (await response.json().catch(() => ({}))) as {
-        detail?: string;
-        student_emails?: string[];
-        students?: User[];
-      };
-      if (!response.ok) {
-        setPeerMessage(data.detail ?? "Не удалось сохранить связи между учениками.");
-        return;
-      }
-      setPeerStudents(data.students ?? []);
-      setPeerEmailInput((data.student_emails ?? []).join("\n"));
-      setPeerMessage("Связи между учениками сохранены.");
-    } catch {
-      setPeerMessage("Не удалось сохранить связи между учениками.");
-    } finally {
-      setSavingPeers(false);
-    }
-  };
 
   const submitProject = async () => {
     setSubmitMessage(null);
@@ -671,63 +586,6 @@ export function ApplyPage() {
         {!isOrganizer ? <Button className="w-full sm:w-auto" onClick={openCreateProject}>Создать проект</Button> : null}
       </div>
 
-      {isStudent ? (
-        <Card className="border-border/70 bg-card/80">
-          <CardHeader>
-            <CardTitle className="text-lg">Научный руководитель и связи с учениками</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Научный руководитель выбирается только из тех наставников, которые сами привязали вас к себе.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded border border-border/60 p-3 text-sm">
-              <p className="text-muted-foreground">Ваш научный руководитель</p>
-              <p className="mt-1 font-medium">
-                {currentSupervisorUser
-                  ? `${currentSupervisorUser.last_name ?? ""} ${currentSupervisorUser.first_name ?? ""}`.trim()
-                  : "Пока не назначен"}
-              </p>
-              {currentSupervisorUser?.email ? (
-                <p className="text-xs text-muted-foreground">{currentSupervisorUser.email}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label>Связанные ученики по email</Label>
-              <Textarea
-                value={peerEmailInput}
-                onChange={event => setPeerEmailInput(event.target.value)}
-                placeholder={"student02@example.com\nstudent03@example.com"}
-                className="min-h-[110px]"
-              />
-              <p className="text-xs text-muted-foreground">
-                Только эти ученики будут доступны вам в проекте как участники 2 и 3.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={savePeerStudents} disabled={savingPeers}>
-                {savingPeers ? "Сохранение..." : "Сохранить связи"}
-              </Button>
-            </div>
-            <div className="rounded border border-border/60 p-3">
-              <p className="mb-2 text-sm font-medium">Сейчас привязаны</p>
-              {peerStudents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Пока никого нет.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {peerStudents.map(user => (
-                    <span key={user.id} className="rounded-full border border-border/60 px-3 py-1 text-xs">
-                      {user.last_name} {user.first_name}
-                      {user.email ? ` • ${user.email}` : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            {peerMessage ? <p className="text-xs text-muted-foreground">{peerMessage}</p> : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
       {isProjectModalOpen ? (
       <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
       <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
@@ -834,18 +692,13 @@ export function ApplyPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без руководителя</SelectItem>
-                {availableTutorUsers.map(user => (
+                {tutorUsers.map(user => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.last_name} {user.first_name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedLeaderId && availableTutorUsers.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Для выбранного участника наставник пока не назначен.
-              </p>
-            ) : null}
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -859,7 +712,7 @@ export function ApplyPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Без участника</SelectItem>
-                  {availableMemberUsers.map(user => (
+                  {studentUsers.map(user => (
                     <SelectItem key={user.id} value={String(user.id)}>
                       {user.last_name} {user.first_name}
                     </SelectItem>
@@ -878,7 +731,7 @@ export function ApplyPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Без участника</SelectItem>
-                  {availableMemberUsers.map(user => (
+                  {studentUsers.map(user => (
                     <SelectItem key={user.id} value={String(user.id)}>
                       {user.last_name} {user.first_name}
                     </SelectItem>

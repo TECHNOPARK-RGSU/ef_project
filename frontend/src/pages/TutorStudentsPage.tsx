@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { API_BASE_URL, fetchList, fetchOne, fetchPage } from "@/lib/api";
+import { API_BASE_URL, fetchList, fetchPage } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import type {
   Comment,
@@ -54,20 +54,12 @@ export function TutorStudentsPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentMessage, setCommentMessage] = useState<string | null>(null);
-  const [allowedStudentIds, setAllowedStudentIds] = useState<number[]>([]);
-  const [allowedStudents, setAllowedStudents] = useState<User[]>([]);
-  const [allowedStudentEmailInput, setAllowedStudentEmailInput] = useState("");
-  const [allowedMessage, setAllowedMessage] = useState<string | null>(null);
-  const [savingAllowed, setSavingAllowed] = useState(false);
 
   const studentUsers = useMemo(
-    () =>
-      users.filter(u => {
-        const code = (u.role?.code ?? "").toLowerCase();
-        return code === "student" || code === "student2" || code === "student3";
-      }),
+    () => users.filter(u => ((u.role?.code ?? "").toLowerCase() === "student")),
     [users],
   );
+
   const sectionsForConference = useMemo(() => {
     if (conferenceFilter === "all") return sections;
     return sections.filter(s => String(s.conference?.id) === conferenceFilter);
@@ -110,15 +102,6 @@ export function TutorStudentsPage() {
       fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(setPresentationTypes),
       fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
       fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
-      fetchOne<{ student_ids?: number[]; student_emails?: string[]; students?: User[] }>(
-        "/api/users/users/my-allowed-students/",
-        controller.signal,
-      ).then(data => {
-        const ids = (data?.student_ids ?? []).map(id => Number(id)).filter(id => Number.isFinite(id));
-        setAllowedStudentIds(ids);
-        setAllowedStudents(data?.students ?? []);
-        setAllowedStudentEmailInput((data?.student_emails ?? []).join("\n"));
-      }),
     ]).catch(() => {});
     return () => controller.abort();
   }, []);
@@ -128,45 +111,6 @@ export function TutorStudentsPage() {
   const applyFilters = () => {
     setPage(1);
     loadProjects(1);
-  };
-
-  const saveAllowedStudents = async () => {
-    const token = getAuthToken();
-    if (!token) {
-      setAllowedMessage("Нужна авторизация.");
-      return;
-    }
-    const emails = Array.from(
-      new Set(
-        allowedStudentEmailInput
-          .split(/[\n,;]+/)
-          .map(value => value.trim().toLowerCase())
-          .filter(Boolean),
-      ),
-    );
-    setSavingAllowed(true);
-    setAllowedMessage(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/users/users/my-allowed-students/`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
-        body: JSON.stringify({ emails }),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { detail?: string };
-        setAllowedMessage(data.detail ?? "Не удалось сохранить список участников.");
-        return;
-      }
-      const payload = (await response.json()) as { student_ids?: number[]; student_emails?: string[]; students?: User[] };
-      setAllowedStudentIds((payload.student_ids ?? []).map(id => Number(id)).filter(id => Number.isFinite(id)));
-      setAllowedStudents(payload.students ?? []);
-      setAllowedStudentEmailInput((payload.student_emails ?? []).join("\n"));
-      setAllowedMessage("Список учеников наставника сохранен.");
-    } catch {
-      setAllowedMessage("Не удалось сохранить список учеников.");
-    } finally {
-      setSavingAllowed(false);
-    }
   };
 
   const openProject = (project: Project) => {
@@ -300,53 +244,6 @@ export function TutorStudentsPage() {
           Проекты учеников, которых вы курируете. Просмотр, редактирование и комментарии.
         </p>
       </div>
-
-      <Card className="border-border/70 bg-card/80">
-        <CardHeader>
-          <CardTitle className="text-lg">Кого можно выбрать вашим руководителем</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Укажите email учеников. После сохранения их проекты сразу появятся у вас, а вы станете их доступным научным руководителем.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <Label>Email учеников</Label>
-            <Textarea
-              value={allowedStudentEmailInput}
-              onChange={event => setAllowedStudentEmailInput(event.target.value)}
-              placeholder={"student01@example.com\nstudent02@example.com"}
-              className="min-h-[120px]"
-            />
-            <p className="text-xs text-muted-foreground">
-              Можно вводить по одному email в строке или через запятую.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={saveAllowedStudents} disabled={savingAllowed}>
-              {savingAllowed ? "Сохранение..." : "Сохранить"}
-            </Button>
-          </div>
-          <div className="rounded border border-border/60 p-3">
-            <p className="mb-2 text-sm font-medium">Сейчас привязаны</p>
-            {allowedStudents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Пока никого нет.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {allowedStudents.map(user => (
-                  <span key={user.id} className="rounded-full border border-border/60 px-3 py-1 text-xs">
-                    {user.last_name} {user.first_name}
-                    {user.email ? ` • ${user.email}` : ""}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Привязано учеников: {allowedStudentIds.length}
-          </p>
-          {allowedMessage ? <p className="text-xs text-muted-foreground">{allowedMessage}</p> : null}
-        </CardContent>
-      </Card>
 
       <Card className="border-border/70 bg-card/80">
         <CardHeader>
