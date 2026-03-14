@@ -16,6 +16,7 @@ services:
       DB_NAME: "${DB_NAME:-ef_project}"
       DB_USER: "${DB_USER:-ef_project}"
       DB_PASSWORD: "${DB_PASSWORD:-change-me}"
+      PGSSLMODE: "${PGSSLMODE:-prefer}"
       MINIO_ENABLED: "${MINIO_ENABLED:-1}"
       MINIO_ENDPOINT: "${MINIO_ENDPOINT:-https://s3.example.com}"
       MINIO_PUBLIC_URL: "${MINIO_PUBLIC_URL:-https://s3.example.com}"
