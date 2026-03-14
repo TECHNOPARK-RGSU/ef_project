@@ -105,6 +105,15 @@ export type User = {
   educational_organization?: EducationalOrganization | null;
 };
 
+export type StudentTeam = {
+  id: number;
+  name: string;
+  tutor?: User | null;
+  members?: User[];
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type EvaluationCriterion = {
   id: number;
   conference?: Conference | null;
@@ -123,6 +132,7 @@ export type Project = {
   members?: User[];
   leader?: User | null;
   tutor?: User | null;
+  team?: StudentTeam | null;
   section?: Section | null;
   status?: ProjectStatus | null;
   stage?: ParticipationStage | null;

@@ -5,16 +5,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ProjectSubmissionModal } from "@/components/projects/ProjectSubmissionModal";
 import { API_BASE_URL, fetchList } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange, formatFormat } from "@/lib/format";
 import { useUserRole } from "@/lib/useUserRole";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export function ConferencesPage() {
   const authUser = getAuthUserInfo();
+  const [location, setLocation] = useLocation();
   const { isOrganizer, isStudent } = useUserRole(authUser?.roleCode);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
@@ -33,7 +35,8 @@ export function ConferencesPage() {
     winnersCount: "1",
     prizesCount: "2",
   });
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConferenceModalOpen, setIsConferenceModalOpen] = useState(false);
+  const [projectConference, setProjectConference] = useState<Conference | null>(null);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
@@ -92,7 +95,7 @@ export function ConferencesPage() {
       prizesCount: "2",
     });
     setSubmitMessage(null);
-    setIsModalOpen(true);
+    setIsConferenceModalOpen(true);
   };
 
   const closeModal = () => {
@@ -107,7 +110,15 @@ export function ConferencesPage() {
       prizesCount: "2",
     });
     setSubmitMessage(null);
-    setIsModalOpen(false);
+    setIsConferenceModalOpen(false);
+  };
+
+  const openApplyModal = (conferenceId: number) => {
+    setLocation(`/conferences?apply=${conferenceId}`);
+  };
+
+  const closeApplyModal = () => {
+    setLocation("/conferences");
   };
 
   const submitConference = async () => {
@@ -146,7 +157,7 @@ export function ConferencesPage() {
         winnersCount: "1",
         prizesCount: "2",
       });
-      setIsModalOpen(false);
+      setIsConferenceModalOpen(false);
     } catch (error) {
       setSubmitState("error");
       setSubmitMessage("Не удалось сохранить конференцию. Повторите попытку или проверьте подключение.");
@@ -170,6 +181,26 @@ export function ConferencesPage() {
       setSubmitMessage("Не удалось удалить конференцию.");
     }
   };
+
+  useEffect(() => {
+    if (!isStudent) {
+      setProjectConference(null);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const applyValue = new URLSearchParams(window.location.search).get("apply");
+    if (!applyValue) {
+      setProjectConference(null);
+      return;
+    }
+    const conferenceId = Number(applyValue);
+    if (!Number.isFinite(conferenceId)) {
+      setProjectConference(null);
+      return;
+    }
+    const selected = conferences.find(item => item.id === conferenceId) ?? null;
+    setProjectConference(selected);
+  }, [conferences, isStudent, location]);
 
   return (
     <section className="space-y-6">
@@ -275,8 +306,8 @@ export function ConferencesPage() {
                     <Link href={`/conferences/${conf.id}`}>Карточка</Link>
                   </Button>
                   {isStudent ? (
-                    <Button size="sm" asChild>
-                      <Link href={`/conferences/${conf.id}/projects?create=1`}>Подать заявку</Link>
+                    <Button size="sm" onClick={() => openApplyModal(conf.id)}>
+                      Подать заявку
                     </Button>
                   ) : null}
                   {isOrganizer ? (
@@ -327,7 +358,16 @@ export function ConferencesPage() {
         </div>
       </div>
 
-      {isOrganizer && isModalOpen ? (
+      {isStudent && projectConference ? (
+        <ProjectSubmissionModal
+          conference={projectConference}
+          open
+          onClose={closeApplyModal}
+          onSubmitted={() => setLocation("/my-projects")}
+        />
+      ) : null}
+
+      {isOrganizer && isConferenceModalOpen ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-3 sm:p-4">
           <div className="flex min-h-full items-start justify-center py-3 sm:items-center sm:py-6">
           <Card className="w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden border-border/70 bg-card shadow-xl flex flex-col">

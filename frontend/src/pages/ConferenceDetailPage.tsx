@@ -10,7 +10,7 @@ import { Link, useRoute } from "wouter";
 
 export function ConferenceDetailPage() {
   const authUser = getAuthUserInfo();
-  const { isOrganizer, isExpert, isTutor, isStudent } = useUserRole(authUser?.roleCode);
+  const { isOrganizer, isExpert, isStudent } = useUserRole(authUser?.roleCode);
 
   const [, params] = useRoute("/conferences/:id");
   const id = params?.id ? Number(params.id) : null;
@@ -94,9 +94,9 @@ export function ConferenceDetailPage() {
               <Link href={`/conferences/${id}/projects`}>Заявки</Link>
             </Button>
           )}
-          {(isTutor || isStudent) && (
+          {isStudent && (
             <Button size="sm" asChild>
-              <Link href={`/conferences/${id}/projects?create=1`}>Подать заявку</Link>
+              <Link href={`/conferences?apply=${id}`}>Подать заявку</Link>
             </Button>
           )}
           {isOrganizer && (
@@ -176,9 +176,9 @@ export function ConferenceDetailPage() {
               {resultsCount > 0 && ` · С результатами: ${resultsCount}`}
             </p>
             <div className="flex flex-wrap gap-2">
-              {(isTutor || isStudent) && (
+              {isStudent && (
                 <Button size="sm" asChild>
-                  <Link href={`/conferences/${id}/projects?create=1`}>Подать заявку</Link>
+                  <Link href={`/conferences?apply=${id}`}>Подать заявку</Link>
                 </Button>
               )}
               {isOrganizer && (

@@ -25,7 +25,7 @@ from conf.models import (
     Section,
 )
 from conf.services.results import calculate_results_for_conference
-from users.models import EducationalOrganization, Role, User
+from users.models import EducationalOrganization, Role, StudentTeam, User
 
 
 class Command(BaseCommand):
@@ -43,6 +43,7 @@ class Command(BaseCommand):
         stages = self._seed_stages()
         presentations = self._seed_places_and_presentations()
         users = self._seed_users(roles, organizations)
+        self._seed_student_teams(users)
         conferences = self._seed_conferences(users["organizers"])
         sections = self._seed_sections(conferences, age_categories)
         criteria = self._seed_criteria(conferences)
@@ -255,6 +256,53 @@ class Command(BaseCommand):
 
         return users
 
+    def _seed_student_teams(self, users: dict[str, list[User]]):
+        tutors_by_email = {user.email: user for user in users["tutors"]}
+        students_by_email = {user.email: user for user in users["students"]}
+        team_specs = [
+            (
+                "RoboLab 9А",
+                "tutor01@example.com",
+                ["student01@example.com", "student02@example.com", "student03@example.com"],
+            ),
+            (
+                "Медиа-студия 10Б",
+                "tutor02@example.com",
+                ["student04@example.com", "student05@example.com"],
+            ),
+            (
+                "BioTech Junior",
+                "tutor03@example.com",
+                ["student06@example.com", "student07@example.com", "student08@example.com"],
+            ),
+            (
+                "Data Science School",
+                "tutor04@example.com",
+                ["student09@example.com", "student10@example.com"],
+            ),
+            (
+                "Эко-исследователи",
+                "tutor05@example.com",
+                ["student11@example.com", "student12@example.com", "student13@example.com"],
+            ),
+            (
+                "Инженеры будущего 11",
+                "tutor06@example.com",
+                ["student14@example.com", "student15@example.com"],
+            ),
+        ]
+
+        for name, tutor_email, member_emails in team_specs:
+            tutor = tutors_by_email.get(tutor_email)
+            members = [students_by_email[email] for email in member_emails if email in students_by_email]
+            if not tutor or not members:
+                continue
+            team, _ = StudentTeam.objects.get_or_create(
+                tutor=tutor,
+                name=name,
+            )
+            team.members.set(members)
+
     def _seed_conferences(self, organizers: list[User]) -> dict[str, Conference]:
         today = timezone.now().date()
         conference_specs = {
@@ -427,6 +475,10 @@ class Command(BaseCommand):
         conference_keys = list(sections.keys())
         students = users["students"]
         tutors = users["tutors"]
+        team_by_student_id: dict[int, StudentTeam] = {}
+        for team in StudentTeam.objects.filter(is_archived=False).select_related("tutor").prefetch_related("members"):
+            for member in team.members.all():
+                team_by_student_id[member.id] = team
         status_cycle = [
             statuses["new"],
             statuses["in_review"],
@@ -442,7 +494,8 @@ class Command(BaseCommand):
             section_list = sections[conference_key]
             section = section_list[idx % len(section_list)]
             leader = students[idx % len(students)]
-            tutor = tutors[idx % len(tutors)] if idx % 5 != 0 else None
+            team = team_by_student_id.get(leader.id)
+            tutor = team.tutor if team else (tutors[idx % len(tutors)] if idx % 5 != 0 else None)
             status = status_cycle[idx % len(status_cycle)]
             stage = stages["final"] if status.code == "final" else stages["qualifying"]
             presentation_type = self._select_presentation_type(
@@ -462,6 +515,7 @@ class Command(BaseCommand):
                     ),
                     "additional_info": "Демо-материалы доступны по запросу оргкомитета.",
                     "tutor": tutor,
+                    "team": team,
                     "status": status,
                     "stage": stage,
                     "presentation_type": presentation_type,
@@ -472,6 +526,9 @@ class Command(BaseCommand):
             if project.tutor_id != (tutor.id if tutor else None):
                 project.tutor = tutor
                 updates.append("tutor")
+            if project.team_id != (team.id if team else None):
+                project.team = team
+                updates.append("team")
             if project.status_id != status.id:
                 project.status = status
                 updates.append("status")
@@ -484,12 +541,15 @@ class Command(BaseCommand):
             if updates:
                 project.save(update_fields=updates)
 
-            member_candidates = [user for user in students if user.id != leader.id]
-            members = [
-                member_candidates[(idx + 1) % len(member_candidates)],
-            ]
-            if idx % 3 == 0:
-                members.append(member_candidates[(idx + 2) % len(member_candidates)])
+            if team:
+                members = [member for member in team.members.all() if member.id != leader.id]
+            else:
+                member_candidates = [user for user in students if user.id != leader.id]
+                members = [
+                    member_candidates[(idx + 1) % len(member_candidates)],
+                ]
+                if idx % 3 == 0:
+                    members.append(member_candidates[(idx + 2) % len(member_candidates)])
             project.members.set(members)
 
             projects.append(project)

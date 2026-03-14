@@ -364,10 +364,13 @@ export function MyProjectsPage() {
                         <p className="text-xs text-muted-foreground">
                           {project.section?.name ?? "—"} · {project.section?.conference?.title ?? "—"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Руководитель:{" "}
-                          {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
-                        </p>
+                      <p className="text-xs text-muted-foreground">
+                        Руководитель:{" "}
+                        {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
+                      </p>
+                      {project.team ? (
+                        <p className="text-xs text-muted-foreground">Команда: {project.team.name}</p>
+                      ) : null}
                         {project.status && (
                           <p className="text-xs text-muted-foreground">Статус: {project.status.name}</p>
                         )}
@@ -497,6 +500,9 @@ export function MyProjectsPage() {
                     <p><span className="text-muted-foreground">Секция:</span> {selectedProject.section?.name ?? "—"}</p>
                     <p><span className="text-muted-foreground">Конференция:</span> {selectedProject.section?.conference?.title ?? "—"}</p>
                     <p><span className="text-muted-foreground">Статус:</span> {selectedProject.status?.name ?? "—"}</p>
+                    {selectedProject.team ? (
+                      <p><span className="text-muted-foreground">Команда:</span> {selectedProject.team.name}</p>
+                    ) : null}
                     <p><span className="text-muted-foreground">Руководитель:</span>{" "}
                       {selectedProject.leader ? `${selectedProject.leader.last_name} ${selectedProject.leader.first_name}` : "—"}
                     </p>

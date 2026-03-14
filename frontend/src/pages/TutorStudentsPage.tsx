@@ -14,6 +14,7 @@ import type {
   Project,
   ProjectStatus,
   Section,
+  StudentTeam,
   User,
 } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
@@ -37,6 +38,7 @@ export function TutorStudentsPage() {
   const [presentationTypes, setPresentationTypes] = useState<PresentationType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [teams, setTeams] = useState<StudentTeam[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [modalMode, setModalMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState({
@@ -54,6 +56,13 @@ export function TutorStudentsPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentMessage, setCommentMessage] = useState<string | null>(null);
+  const [teamForm, setTeamForm] = useState({
+    name: "",
+    memberEmails: "",
+  });
+  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [teamMessage, setTeamMessage] = useState<string | null>(null);
+  const [savingTeam, setSavingTeam] = useState(false);
 
   const studentUsers = useMemo(
     () => users.filter(u => ((u.role?.code ?? "").toLowerCase() === "student")),
@@ -102,6 +111,7 @@ export function TutorStudentsPage() {
       fetchList<PresentationType>("/api/conf/presentation-types/", controller.signal).then(setPresentationTypes),
       fetchList<User>("/api/users/users/", controller.signal).then(setUsers),
       fetchList<Comment>("/api/conf/comments/", controller.signal).then(setComments),
+      fetchList<StudentTeam>("/api/users/student-teams/", controller.signal).then(setTeams),
     ]).catch(() => {});
     return () => controller.abort();
   }, []);
@@ -111,6 +121,120 @@ export function TutorStudentsPage() {
   const applyFilters = () => {
     setPage(1);
     loadProjects(1);
+  };
+
+  const resetTeamForm = () => {
+    setTeamForm({
+      name: "",
+      memberEmails: "",
+    });
+    setEditingTeamId(null);
+    setTeamMessage(null);
+  };
+
+  const editTeam = (team: StudentTeam) => {
+    setEditingTeamId(team.id);
+    setTeamForm({
+      name: team.name,
+      memberEmails: (team.members ?? [])
+        .map(member => member.email ?? "")
+        .filter(Boolean)
+        .join("\n"),
+    });
+    setTeamMessage(null);
+  };
+
+  const saveTeam = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setTeamMessage("Нужна авторизация.");
+      return;
+    }
+    const emails = Array.from(
+      new Set(
+        teamForm.memberEmails
+          .split(/[\n,;]+/)
+          .map(value => value.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    if (!teamForm.name.trim()) {
+      setTeamMessage("Укажите название команды.");
+      return;
+    }
+    if (emails.length === 0) {
+      setTeamMessage("Добавьте хотя бы один email ученика.");
+      return;
+    }
+    setSavingTeam(true);
+    setTeamMessage(null);
+    try {
+      const url = editingTeamId
+        ? `${API_BASE_URL}/api/users/student-teams/${editingTeamId}/`
+        : `${API_BASE_URL}/api/users/student-teams/`;
+      const response = await fetch(url, {
+        method: editingTeamId ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({
+          name: teamForm.name.trim(),
+          member_emails: emails,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as StudentTeam & {
+        detail?: string;
+        member_emails?: string[];
+        name?: string[];
+      };
+      if (!response.ok) {
+        const fallback =
+          payload.detail
+          ?? (Array.isArray(payload.name) ? payload.name[0] : undefined)
+          ?? "Не удалось сохранить команду.";
+        setTeamMessage(fallback);
+        return;
+      }
+
+      setTeams(current => {
+        if (editingTeamId) {
+          return current.map(item => (item.id === payload.id ? payload : item));
+        }
+        return [payload, ...current];
+      });
+      resetTeamForm();
+      setTeamMessage(editingTeamId ? "Команда обновлена." : "Команда создана.");
+    } catch {
+      setTeamMessage("Не удалось сохранить команду.");
+    } finally {
+      setSavingTeam(false);
+    }
+  };
+
+  const archiveTeam = async (teamId: number) => {
+    const token = getAuthToken();
+    if (!token) {
+      setTeamMessage("Нужна авторизация.");
+      return;
+    }
+    if (!window.confirm("Удалить команду? Состав можно будет восстановить только вручную.")) return;
+    setTeamMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/student-teams/${teamId}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Token ${token}` },
+      });
+      if (!response.ok) {
+        setTeamMessage("Не удалось удалить команду.");
+        return;
+      }
+      setTeams(current => current.filter(team => team.id !== teamId));
+      if (editingTeamId === teamId) resetTeamForm();
+      setTeamMessage("Команда удалена.");
+    } catch {
+      setTeamMessage("Не удалось удалить команду.");
+    }
   };
 
   const openProject = (project: Project) => {
@@ -247,6 +371,88 @@ export function TutorStudentsPage() {
 
       <Card className="border-border/70 bg-card/80">
         <CardHeader>
+          <CardTitle className="text-lg">Команды учеников</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Наставник собирает команды по email. В команде может быть до 3 учеников.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <div className="space-y-3 rounded-lg border border-border/60 p-4">
+              <div className="space-y-2">
+                <Label>Название команды</Label>
+                <Input
+                  value={teamForm.name}
+                  onChange={event => setTeamForm(current => ({ ...current, name: event.target.value }))}
+                  placeholder="Например, RoboLab 9А"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email учеников</Label>
+                <Textarea
+                  value={teamForm.memberEmails}
+                  onChange={event =>
+                    setTeamForm(current => ({ ...current, memberEmails: event.target.value }))
+                  }
+                  className="min-h-[140px]"
+                  placeholder={"student01@example.com\nstudent02@example.com"}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={saveTeam} disabled={savingTeam}>
+                  {savingTeam ? "Сохранение..." : editingTeamId ? "Сохранить команду" : "Создать команду"}
+                </Button>
+                {editingTeamId ? (
+                  <Button variant="outline" onClick={resetTeamForm}>
+                    Отмена
+                  </Button>
+                ) : null}
+              </div>
+              {teamMessage ? <p className="text-sm text-muted-foreground">{teamMessage}</p> : null}
+            </div>
+
+            <div className="space-y-3">
+              {teams.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                  Команд пока нет. Создайте первую команду, и ученики смогут выбирать ее при подаче заявки.
+                </p>
+              ) : (
+                teams.map(team => (
+                  <div key={team.id} className="rounded-lg border border-border/60 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="font-medium">{team.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Учеников: {team.members?.length ?? 0}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {(team.members ?? [])
+                            .map(member => {
+                              const userName = `${member.last_name ?? ""} ${member.first_name ?? ""}`.trim();
+                              return `${userName || member.email} (${member.email ?? "без email"})`;
+                            })
+                            .join(", ") || "Состав не заполнен"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => editTeam(team)}>
+                          Изменить
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => archiveTeam(team.id)}>
+                          Удалить
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70 bg-card/80">
+        <CardHeader>
           <CardTitle className="text-lg">Поиск и фильтры</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-5">
@@ -337,6 +543,9 @@ export function TutorStudentsPage() {
                       <p className="text-xs text-muted-foreground">
                         Руководитель: {project.leader ? `${project.leader.last_name} ${project.leader.first_name}` : "—"}
                       </p>
+                      {project.team ? (
+                        <p className="text-xs text-muted-foreground">Команда: {project.team.name}</p>
+                      ) : null}
                       {project.status && (
                         <p className="text-xs text-muted-foreground">Статус: {project.status.name}</p>
                       )}
@@ -406,6 +615,9 @@ export function TutorStudentsPage() {
                     <p><span className="text-muted-foreground">Секция:</span> {selectedProject.section?.name ?? "—"}</p>
                     <p><span className="text-muted-foreground">Конференция:</span> {selectedProject.section?.conference?.title ?? "—"}</p>
                     <p><span className="text-muted-foreground">Статус:</span> {selectedProject.status?.name ?? "—"}</p>
+                    {selectedProject.team ? (
+                      <p><span className="text-muted-foreground">Команда:</span> {selectedProject.team.name}</p>
+                    ) : null}
                     <p><span className="text-muted-foreground">Руководитель:</span>{" "}
                       {selectedProject.leader ? `${selectedProject.leader.last_name} ${selectedProject.leader.first_name}` : "—"}
                     </p>

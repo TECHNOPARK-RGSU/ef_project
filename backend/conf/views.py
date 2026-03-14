@@ -567,6 +567,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         "presentation_type",
         "leader",
         "tutor",
+        "team",
     ]
     search_fields = ["title", "description", "additional_info"]
     ordering_fields = ["title", "created_at"]

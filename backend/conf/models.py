@@ -415,6 +415,14 @@ class Project(BaseModel):
         related_name="tutor_projects",
         verbose_name="Научный руководитель",
     )
+    team = models.ForeignKey(
+        "users.StudentTeam",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+        verbose_name="Команда",
+    )
     section = models.ForeignKey(
         Section,
         on_delete=models.PROTECT,

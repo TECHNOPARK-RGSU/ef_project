@@ -26,7 +26,7 @@ import { Link, useLocation, useRoute } from "wouter";
 
 export function ApplyPage() {
   const [, paramsFromRoute] = useRoute("/conferences/:id/projects");
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
   const defaultConferenceId = conferenceIdFromRoute != null ? String(conferenceIdFromRoute) : "";
   const authUser = getAuthUserInfo();
@@ -176,6 +176,14 @@ export function ApplyPage() {
     const value = (new URLSearchParams(window.location.search).get("create") ?? "").toLowerCase();
     return value === "1" || value === "true" || value === "yes";
   }, [location]);
+  useEffect(() => {
+    if (!isStudent) return;
+    if (conferenceIdFromRoute != null && shouldAutoOpenCreate) {
+      setLocation(`/conferences?apply=${conferenceIdFromRoute}`);
+      return;
+    }
+    setLocation("/my-projects");
+  }, [conferenceIdFromRoute, isStudent, setLocation, shouldAutoOpenCreate]);
   useEffect(() => {
     setAutoCreateHandled(false);
   }, [location]);
@@ -571,6 +579,8 @@ export function ApplyPage() {
       setReplyMessage("Не удалось отправить комментарий.");
     }
   };
+
+  if (isStudent) return null;
 
   return (
     <section className="space-y-6">

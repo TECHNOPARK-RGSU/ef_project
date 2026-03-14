@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from users.views import (
     EducationalOrganizationViewSet,
     RoleViewSet,
+    StudentTeamViewSet,
     UserViewSet,
 )
 
@@ -13,6 +14,7 @@ router.register(
     basename="educational-organization",
 )
 router.register(r"roles", RoleViewSet, basename="role")
+router.register(r"student-teams", StudentTeamViewSet, basename="student-team")
 router.register(r"users", UserViewSet, basename="user")
 
 urlpatterns = [

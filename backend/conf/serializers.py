@@ -18,8 +18,9 @@ from conf.models import (
     ExpertAssignment,
     ExpertAssignmentItem,
 )
-from users.serializers import UserSerializer
-from users.models import User
+from users.serializers import StudentTeamSerializer, UserSerializer
+from users.models import StudentTeam, User
+from utils.roles import is_student_role, normalize_role_code
 
 
 class PlaceSerializer(serializers.ModelSerializer):
@@ -341,6 +342,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    team = StudentTeamSerializer(read_only=True, allow_null=True)
+    team_id = serializers.PrimaryKeyRelatedField(
+        queryset=StudentTeam.objects.filter(is_archived=False),
+        source="team",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     section = SectionSerializer(read_only=True)
     section_id = serializers.PrimaryKeyRelatedField(
         queryset=Section.objects.all(),
@@ -380,6 +389,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "leader_id",
             "tutor",
             "tutor_id",
+            "team",
+            "team_id",
             "section",
             "section_id",
             "status",
@@ -393,6 +404,67 @@ class ProjectSerializer(serializers.ModelSerializer):
             "is_archived",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        request_role_code = normalize_role_code(getattr(getattr(request_user, "role", None), "code", ""))
+
+        leader = attrs.get("leader", getattr(self.instance, "leader", None))
+        members = attrs.get("members")
+        team = attrs.get("team", getattr(self.instance, "team", None))
+
+        if leader is None:
+            raise serializers.ValidationError({"leader_id": "Укажите руководителя проекта."})
+
+        leader_role_code = normalize_role_code(getattr(getattr(leader, "role", None), "code", ""))
+        if not is_student_role(leader_role_code):
+            raise serializers.ValidationError(
+                {"leader_id": "Руководителем проекта может быть только ученик."}
+            )
+
+        if members is not None:
+            member_ids = [member.id for member in members]
+            if leader.id in member_ids:
+                raise serializers.ValidationError(
+                    {"member_ids": "Руководитель не должен дублироваться в участниках."}
+                )
+            invalid_members = [
+                member.email or f"id={member.id}"
+                for member in members
+                if not is_student_role(getattr(getattr(member, "role", None), "code", ""))
+            ]
+            if invalid_members:
+                raise serializers.ValidationError(
+                    {"member_ids": f"В участниках могут быть только ученики: {', '.join(invalid_members)}."}
+                )
+
+        if is_student_role(request_role_code) and request_user and leader.id != request_user.id:
+            raise serializers.ValidationError(
+                {"leader_id": "Ученик может подавать проект только от своего имени."}
+            )
+
+        if team is not None:
+            team_members = list(
+                team.members.filter(is_archived=False).select_related("role").all()
+            )
+            team_member_ids = {member.id for member in team_members}
+            if not team_member_ids:
+                raise serializers.ValidationError(
+                    {"team_id": "В выбранной команде нет учеников."}
+                )
+            if leader.id not in team_member_ids:
+                raise serializers.ValidationError(
+                    {"team_id": "Руководитель проекта должен входить в выбранную команду."}
+                )
+            if is_student_role(request_role_code) and request_user and request_user.id not in team_member_ids:
+                raise serializers.ValidationError(
+                    {"team_id": "Можно выбрать только свою команду."}
+                )
+            attrs["members"] = [member for member in team_members if member.id != leader.id]
+            attrs["tutor"] = team.tutor
+
+        return attrs
 
 
 class CommentSerializer(serializers.ModelSerializer):

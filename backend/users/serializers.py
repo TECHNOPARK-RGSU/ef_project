@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from users.models import EducationalOrganization, Role, User
+from users.models import EducationalOrganization, Role, StudentTeam, User
+from utils.roles import is_student_role, normalize_role_code
 
 
 class EducationalOrganizationSerializer(serializers.ModelSerializer):
@@ -97,6 +98,158 @@ class UserSerializer(serializers.ModelSerializer):
         if password:
             instance.set_password(password)
         instance.save()
+        return instance
+
+
+class StudentTeamSerializer(serializers.ModelSerializer):
+    """Сериализатор команды учеников наставника."""
+
+    tutor = UserSerializer(read_only=True)
+    tutor_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source="tutor",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    members = UserSerializer(many=True, read_only=True)
+    member_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source="members",
+        many=True,
+        write_only=True,
+        required=False,
+    )
+    member_emails = serializers.ListField(
+        child=serializers.EmailField(),
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = StudentTeam
+        fields = [
+            "id",
+            "name",
+            "tutor",
+            "tutor_id",
+            "members",
+            "member_ids",
+            "member_emails",
+            "created_at",
+            "updated_at",
+            "is_archived",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+        validators = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["tutor_id"].required = False
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        request_role_code = normalize_role_code(getattr(getattr(request_user, "role", None), "code", ""))
+
+        tutor = attrs.get("tutor", getattr(self.instance, "tutor", None))
+        if tutor is None and request_role_code == "tutor":
+            attrs["tutor"] = request_user
+            tutor = request_user
+
+        if tutor is None:
+            raise serializers.ValidationError({"tutor_id": "Укажите наставника команды."})
+
+        tutor_role_code = normalize_role_code(getattr(getattr(tutor, "role", None), "code", ""))
+        if tutor_role_code != "tutor":
+            raise serializers.ValidationError({"tutor_id": "Команда может быть создана только для наставника."})
+
+        if request_role_code == "tutor" and request_user and tutor.id != request_user.id:
+            raise serializers.ValidationError({"tutor_id": "Наставник может управлять только своими командами."})
+
+        name = (attrs.get("name", getattr(self.instance, "name", "")) or "").strip()
+        if not name:
+            raise serializers.ValidationError({"name": "Укажите название команды."})
+        existing = StudentTeam.objects.filter(
+            tutor=tutor,
+            name=name,
+            is_archived=False,
+        )
+        if self.instance is not None:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError({"name": "У наставника уже есть команда с таким названием."})
+
+        member_emails = self.initial_data.get("member_emails")
+        resolved_members = None
+        if member_emails is not None:
+            if not isinstance(member_emails, list):
+                raise serializers.ValidationError({"member_emails": "Ожидается список email."})
+            normalized_emails = sorted(
+                {
+                    str(email).strip().lower()
+                    for email in member_emails
+                    if str(email).strip()
+                }
+            )
+            members = list(
+                User.objects.filter(
+                    email__in=normalized_emails,
+                    is_archived=False,
+                ).select_related("role")
+            )
+            found_emails = {member.email.lower() for member in members if member.email}
+            missing_emails = [email for email in normalized_emails if email not in found_emails]
+            if missing_emails:
+                raise serializers.ValidationError(
+                    {"member_emails": f"Не найдены пользователи: {', '.join(missing_emails)}."}
+                )
+            resolved_members = members
+        elif "members" in attrs:
+            resolved_members = list(attrs["members"])
+        elif self.instance is not None:
+            resolved_members = list(self.instance.members.select_related("role").all())
+
+        if not resolved_members:
+            raise serializers.ValidationError(
+                {"member_emails": "Добавьте хотя бы одного ученика в команду."}
+            )
+
+        if len(resolved_members) > 3:
+            raise serializers.ValidationError(
+                {"member_emails": "В одной команде может быть не более 3 учеников."}
+            )
+
+        invalid_members = [
+            member.email or f"id={member.id}"
+            for member in resolved_members
+            if not is_student_role(getattr(getattr(member, "role", None), "code", ""))
+        ]
+        if invalid_members:
+            raise serializers.ValidationError(
+                {"member_emails": f"В команду можно добавлять только учеников: {', '.join(invalid_members)}."}
+            )
+
+        attrs["resolved_members"] = resolved_members
+        return attrs
+
+    def create(self, validated_data):
+        members = validated_data.pop("resolved_members", [])
+        validated_data.pop("members", None)
+        validated_data.pop("member_emails", None)
+        team = StudentTeam.objects.create(**validated_data)
+        team.members.set(members)
+        return team
+
+    def update(self, instance, validated_data):
+        members = validated_data.pop("resolved_members", None)
+        validated_data.pop("members", None)
+        validated_data.pop("member_emails", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if members is not None:
+            instance.members.set(members)
         return instance
 
 

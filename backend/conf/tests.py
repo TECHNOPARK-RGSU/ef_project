@@ -12,9 +12,9 @@ from conf.models import (
     ProjectScore,
     Section,
 )
-from conf.serializers import ProjectScoreSerializer
+from conf.serializers import ProjectScoreSerializer, ProjectSerializer
 from conf.services.results import calculate_results_for_conference
-from users.models import Role, User
+from users.models import Role, StudentTeam, User
 
 
 class ResultsCalculationTests(TestCase):
@@ -212,3 +212,97 @@ class ProjectScoreValidationTests(TestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn("criterion_id", serializer.errors)
+
+
+class ProjectTeamValidationTests(TestCase):
+    def setUp(self):
+        self.student_role = Role.objects.create(name="Ученик", code="student")
+        self.tutor_role = Role.objects.create(name="Наставник", code="tutor")
+        self.student = User.objects.create_user(
+            email="student@example.com",
+            password="password",
+            role=self.student_role,
+            first_name="Иван",
+            last_name="Ученик",
+        )
+        self.teammate = User.objects.create_user(
+            email="teammate@example.com",
+            password="password",
+            role=self.student_role,
+            first_name="Петр",
+            last_name="Соавтор",
+        )
+        self.foreign_student = User.objects.create_user(
+            email="foreign@example.com",
+            password="password",
+            role=self.student_role,
+            first_name="Сергей",
+            last_name="Посторонний",
+        )
+        self.tutor = User.objects.create_user(
+            email="tutor@example.com",
+            password="password",
+            role=self.tutor_role,
+            first_name="Анна",
+            last_name="Наставник",
+        )
+        self.team = StudentTeam.objects.create(name="Команда А", tutor=self.tutor)
+        self.team.members.set([self.student, self.teammate])
+
+        self.conference = Conference.objects.create(
+            title="Тестовая конференция",
+            start_date="2025-03-10",
+            end_date="2025-03-12",
+        )
+        self.category = AgeCategory.objects.create(name="13-15", min_age=13, max_age=15)
+        self.section = Section.objects.create(
+            name="Секция А",
+            conference=self.conference,
+            category=self.category,
+        )
+        self.status = ProjectStatus.objects.create(name="Новый", code="new")
+        self.stage = ParticipationStage.objects.create(name="Отборочный", code="qualifying")
+        self.place = Place.objects.create(name="Зал 2", address="ул. Ленина, 2")
+        self.presentation_type = PresentationType.objects.create(
+            name="Доклад",
+            code="oral",
+            place=self.place,
+        )
+
+    def test_student_can_submit_project_from_own_team(self):
+        serializer = ProjectSerializer(
+            data={
+                "title": "Командный проект",
+                "leader_id": self.student.id,
+                "team_id": self.team.id,
+                "section_id": self.section.id,
+                "status_id": self.status.id,
+                "stage_id": self.stage.id,
+                "presentation_type_id": self.presentation_type.id,
+            },
+            context={"request": type("Request", (), {"user": self.student})()},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["tutor"], self.tutor)
+        self.assertEqual(
+            [member.id for member in serializer.validated_data["members"]],
+            [self.teammate.id],
+        )
+
+    def test_student_cannot_submit_project_from_foreign_team(self):
+        serializer = ProjectSerializer(
+            data={
+                "title": "Чужой проект",
+                "leader_id": self.foreign_student.id,
+                "team_id": self.team.id,
+                "section_id": self.section.id,
+                "status_id": self.status.id,
+                "stage_id": self.stage.id,
+                "presentation_type_id": self.presentation_type.id,
+            },
+            context={"request": type("Request", (), {"user": self.foreign_student})()},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("team_id", serializer.errors)

@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.core.exceptions import ValidationError
 from django.db import models
 from utils.models import BaseModel
 
@@ -159,3 +160,44 @@ class User(AbstractUser, BaseModel):
         if self.email:
             parts.append(f"({self.email})")
         return " ".join(parts) if parts else f"Пользователь #{self.pk}"
+
+
+class StudentTeam(BaseModel):
+    """Команда учеников, которую собирает наставник."""
+
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Название команды",
+    )
+    tutor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="owned_student_teams",
+        verbose_name="Наставник",
+    )
+    members = models.ManyToManyField(
+        User,
+        related_name="team_memberships",
+        verbose_name="Участники команды",
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "Команда учеников"
+        verbose_name_plural = "Команды учеников"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutor", "name"],
+                name="unique_student_team_name_per_tutor",
+            )
+        ]
+
+    def clean(self):
+        tutor_role = (getattr(self.tutor.role, "code", "") or "").lower()
+        if tutor_role != "tutor":
+            raise ValidationError({"tutor": "Команду может вести только наставник."})
+
+    def __str__(self):
+        tutor_email = getattr(self.tutor, "email", "") or f"user#{self.tutor_id}"
+        return f"{self.name} ({tutor_email})"
