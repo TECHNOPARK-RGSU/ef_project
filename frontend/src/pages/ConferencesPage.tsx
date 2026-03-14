@@ -12,11 +12,12 @@ import { formatDateRange, formatFormat } from "@/lib/format";
 import { useUserRole } from "@/lib/useUserRole";
 import type { Conference } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 
 export function ConferencesPage() {
   const authUser = getAuthUserInfo();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
+  const search = useSearch();
   const { isOrganizer, isStudent } = useUserRole(authUser?.roleCode);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [conferences, setConferences] = useState<Conference[]>([]);
@@ -187,8 +188,7 @@ export function ConferencesPage() {
       setProjectConference(null);
       return;
     }
-    if (typeof window === "undefined") return;
-    const applyValue = new URLSearchParams(window.location.search).get("apply");
+    const applyValue = new URLSearchParams(search).get("apply");
     if (!applyValue) {
       setProjectConference(null);
       return;
@@ -200,7 +200,7 @@ export function ConferencesPage() {
     }
     const selected = conferences.find(item => item.id === conferenceId) ?? null;
     setProjectConference(selected);
-  }, [conferences, isStudent, location]);
+  }, [conferences, isStudent, search]);
 
   return (
     <section className="space-y-6">
