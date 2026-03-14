@@ -16,6 +16,31 @@ import type {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 
+const getDownloadFilename = (contentDisposition: string | null, fallback: string) => {
+  if (!contentDisposition) return fallback;
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallback;
+    }
+  }
+  const plainMatch = contentDisposition.match(/filename="?([^";\n]+)"?/i);
+  return plainMatch?.[1] ?? fallback;
+};
+
+const triggerBlobDownload = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1500);
+};
+
 export function AssignmentsPage() {
   const [, paramsFromRoute] = useRoute("/conferences/:id/assignments");
   const conferenceIdFromRoute = paramsFromRoute?.id ? Number(paramsFromRoute.id) : null;
@@ -179,26 +204,14 @@ export function AssignmentsPage() {
       setMessage("В назначении нет файлов для скачивания.");
       return;
     }
-    const disposition = response.headers.get("Content-Disposition") ?? "";
-    const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
-    const plainMatch = disposition.match(/filename="?([^";\n]+)"?/i);
-    let decodedFilename = plainMatch?.[1] ?? `assignment_${assignmentId}.zip`;
-    if (utf8Match?.[1]) {
-      try {
-        decodedFilename = decodeURIComponent(utf8Match[1]);
-      } catch {
-        decodedFilename = plainMatch?.[1] ?? decodedFilename;
-      }
-    }
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = decodedFilename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    const filename = getDownloadFilename(
+      response.headers.get("Content-Disposition"),
+      `assignment_${assignmentId}.zip`,
+    );
+    triggerBlobDownload(blob, filename);
   };
 
-  const downloadProjectFile = async (projectId: number) => {
+  const downloadProjectFile = async (projectId: number, projectFileUrl?: string | null) => {
     setMessage(null);
     const token = getAuthToken();
     if (!token) {
@@ -213,15 +226,13 @@ export function AssignmentsPage() {
       return;
     }
     const blob = await response.blob();
-    const disp = response.headers.get("Content-Disposition");
-    const match = disp?.match(/filename="?([^";\n]+)"?/);
-    const filename = match?.[1] ?? `project_${projectId}.bin`;
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    const fallbackFilename =
+      projectFileUrl?.split("/").pop()?.split("?")[0] || `project_${projectId}.bin`;
+    const filename = getDownloadFilename(
+      response.headers.get("Content-Disposition"),
+      fallbackFilename,
+    );
+    triggerBlobDownload(blob, filename);
   };
 
   const openScoreModal = (item: ExpertAssignmentItem, assignment: ExpertAssignment) => {
@@ -491,14 +502,14 @@ export function AssignmentsPage() {
                             {(isExpertRole || isOrganizerRole) ? (
                               <div className="flex flex-wrap gap-1.5">
                                 {item.project.files ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs"
-                                    onClick={() => downloadProjectFile(item.project.id)}
-                                  >
-                                    Скачать
-                                  </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 text-xs"
+                                      onClick={() => downloadProjectFile(item.project.id, item.project.files)}
+                                    >
+                                      Скачать
+                                    </Button>
                                 ) : null}
                                 {isExpertRole ? (
                                   <Button
@@ -543,7 +554,7 @@ export function AssignmentsPage() {
                                           size="sm"
                                           variant="outline"
                                           className="h-7 text-xs"
-                                          onClick={() => downloadProjectFile(item.project.id)}
+                                          onClick={() => downloadProjectFile(item.project.id, item.project.files)}
                                         >
                                           Скачать
                                         </Button>
