@@ -222,6 +222,37 @@ class ProjectScoreValidationTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("criterion_id", serializer.errors)
 
+    def test_expert_can_validate_score_without_evaluator_id(self):
+        serializer = ProjectScoreSerializer(
+            data={
+                "project_id": self.project_a.id,
+                "criterion_id": self.criterion_a.id,
+                "score": 5,
+            },
+            context={"request": type("Request", (), {"user": self.user})()},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_rejects_duplicate_score_for_implicit_expert_evaluator(self):
+        ProjectScore.objects.create(
+            project=self.project_a,
+            criterion=self.criterion_a,
+            evaluator=self.user,
+            score=7,
+        )
+        serializer = ProjectScoreSerializer(
+            data={
+                "project_id": self.project_a.id,
+                "criterion_id": self.criterion_a.id,
+                "score": 8,
+            },
+            context={"request": type("Request", (), {"user": self.user})()},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("criterion_id", serializer.errors)
+
 
 class ProjectTeamValidationTests(TestCase):
     def setUp(self):

@@ -568,10 +568,19 @@ class ProjectScoreSerializer(serializers.ModelSerializer):
             "is_archived",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        validators = []
 
     def validate(self, attrs):
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        request_role_code = normalize_role_code(
+            getattr(getattr(request_user, "role", None), "code", "")
+        )
         criterion = attrs.get("criterion", getattr(self.instance, "criterion", None))
         project = attrs.get("project", getattr(self.instance, "project", None))
+        evaluator = attrs.get("evaluator", getattr(self.instance, "evaluator", None))
+        if evaluator is None and request_role_code == "expert":
+            evaluator = request_user
         score = attrs.get("score")
         errors = {}
         if score is not None:
@@ -586,6 +595,18 @@ class ProjectScoreSerializer(serializers.ModelSerializer):
             )
             if project_conference is None or project_conference != criterion.conference_id:
                 errors["criterion_id"] = "Критерий не относится к конференции проекта."
+
+        if project and criterion and evaluator:
+            duplicate = ProjectScore.objects.filter(
+                project=project,
+                criterion=criterion,
+                evaluator=evaluator,
+                is_archived=False,
+            )
+            if self.instance is not None:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                errors["criterion_id"] = "Оценка по этому критерию уже сохранена."
 
         if errors:
             raise serializers.ValidationError(errors)
