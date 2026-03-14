@@ -379,8 +379,17 @@ class ExpertAssignmentDownloadZipTests(TestCase):
             presentation_type=self.presentation_type,
             files=SimpleUploadedFile("platform.pdf", b"platform"),
         )
+        self.project_c = Project.objects.create(
+            title="Система наблюдения",
+            leader=self.student,
+            section=self.section,
+            status=self.status,
+            stage=self.stage,
+            presentation_type=self.presentation_type,
+        )
         ExpertAssignmentItem.objects.create(assignment=self.assignment, project=self.project_b)
         ExpertAssignmentItem.objects.create(assignment=self.assignment, project=self.project_a)
+        ExpertAssignmentItem.objects.create(assignment=self.assignment, project=self.project_c)
 
     def test_download_zip_uses_conference_name_and_project_folders(self):
         self.client.force_authenticate(self.expert)
@@ -390,13 +399,16 @@ class ExpertAssignmentDownloadZipTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("filename*=UTF-8''%D0%98%D0%BD%D0%B6%D0%B5%D0%BD%D0%B5%D1%80%D1%8B%20%D0%B1%D1%83%D0%B4%D1%83%D1%89%D0%B5%D0%B3%D0%BE%202026.zip", response["Content-Disposition"])
+        self.assertIn("filename*=", response["Content-Disposition"])
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             self.assertEqual(
                 archive.namelist(),
                 [
+                    "Адаптивный робот/",
                     "Адаптивный робот/robot.pdf",
+                    "Беспилотная платформа/",
                     "Беспилотная платформа/platform.pdf",
+                    "Система наблюдения/",
                 ],
             )

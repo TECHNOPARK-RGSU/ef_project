@@ -1,10 +1,10 @@
 import os
 import tempfile
 import zipfile
-from urllib.parse import quote
 
 from django.db import connection, transaction
 from django.db.models import Q
+from django.utils.http import content_disposition_header
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
@@ -69,14 +69,6 @@ def _sanitize_download_name(value: str, fallback: str) -> str:
     cleaned = "".join(char for char in cleaned if ord(char) >= 32)
     cleaned = cleaned.strip().strip(".")
     return cleaned or fallback
-
-
-def _content_disposition(filename: str) -> str:
-    encoded = quote(filename)
-    ascii_fallback = (
-        filename.encode("ascii", "ignore").decode("ascii").strip() or "download"
-    )
-    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
 class PlaceViewSet(viewsets.ModelViewSet):
@@ -873,9 +865,6 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
             with zipfile.ZipFile(tmpfile, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for item in items:
                     project = item.project
-                    if not project.files:
-                        continue
-                    filename = os.path.basename(project.files.name)
                     folder_name = _sanitize_download_name(
                         project.title,
                         f"Проект {project.id}",
@@ -886,12 +875,19 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
                         folder_name = f"{original_folder_name} ({duplicate_index})"
                         duplicate_index += 1
                     used_folder_names.add(folder_name)
+                    zipf.writestr(f"{folder_name}/", b"")
+                    if not project.files:
+                        continue
+                    filename = os.path.basename(project.files.name)
                     arcname = f"{folder_name}/{filename}"
                     with project.files.open("rb") as file_obj:
                         zipf.writestr(arcname, file_obj.read())
             tmpfile.seek(0)
             response = HttpResponse(tmpfile.read(), content_type="application/zip")
-            response["Content-Disposition"] = _content_disposition(archive_filename)
+            response["Content-Disposition"] = content_disposition_header(
+                True,
+                archive_filename,
+            )
             return response
 
 

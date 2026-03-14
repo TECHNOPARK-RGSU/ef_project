@@ -234,6 +234,10 @@ CORS_ALLOWED_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+    "Content-Length",
+]
 
 # Security defaults for production.
 # NOTE: many deployments terminate TLS at an external proxy/load balancer and forward
