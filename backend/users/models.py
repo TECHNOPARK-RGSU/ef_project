@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.core.exceptions import ValidationError
 from django.db import models
 from utils.models import BaseModel
 
@@ -152,10 +153,84 @@ class User(AbstractUser, BaseModel):
         verbose_name_plural = "Пользователи"
         ordering = ["last_name", "first_name"]
 
+
+class TutorStudentAccess(BaseModel):
+    """Разрешение: наставник допускает участника к выбору себя как руководителя."""
+
+    tutor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="allowed_student_links",
+        verbose_name="Наставник",
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="available_tutor_links",
+        verbose_name="Участник",
+    )
+
+    class Meta:
+        verbose_name = "Доступ наставника к участнику"
+        verbose_name_plural = "Доступы наставников к участникам"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutor", "student"],
+                name="unique_tutor_student_access",
+            )
+        ]
+
+    def clean(self):
+        tutor_role = (getattr(self.tutor.role, "code", "") or "").lower()
+        student_role = (getattr(self.student.role, "code", "") or "").lower()
+        if tutor_role != "tutor":
+            raise ValidationError({"tutor": "Выбранный пользователь не является наставником."})
+        if student_role not in {"student", "student2", "student3"}:
+            raise ValidationError({"student": "Можно выбирать только пользователей с ролью ученика."})
+
     def __str__(self):
-        parts = []
-        if self.last_name or self.first_name:
-            parts.append(f"{self.last_name or ''} {self.first_name or ''}".strip())
-        if self.email:
-            parts.append(f"({self.email})")
-        return " ".join(parts) if parts else f"Пользователь #{self.pk}"
+        tutor_email = getattr(self.tutor, "email", "") or f"user#{self.tutor_id}"
+        student_email = getattr(self.student, "email", "") or f"user#{self.student_id}"
+        return f"{tutor_email} -> {student_email}"
+
+
+class StudentPeerLink(BaseModel):
+    """Симметричная связь между двумя учениками для совместных проектов."""
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="peer_links",
+        verbose_name="Ученик",
+    )
+    peer = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="peer_of_links",
+        verbose_name="Связанный ученик",
+    )
+
+    class Meta:
+        verbose_name = "Связь между учениками"
+        verbose_name_plural = "Связи между учениками"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "peer"],
+                name="unique_student_peer_link",
+            )
+        ]
+
+    def clean(self):
+        student_role = (getattr(self.student.role, "code", "") or "").lower()
+        peer_role = (getattr(self.peer.role, "code", "") or "").lower()
+        if student_role not in {"student", "student2", "student3"}:
+            raise ValidationError({"student": "Связь можно создавать только для учеников."})
+        if peer_role not in {"student", "student2", "student3"}:
+            raise ValidationError({"peer": "Связь можно создавать только с учеником."})
+        if self.student_id == self.peer_id:
+            raise ValidationError({"peer": "Нельзя связать ученика с самим собой."})
+
+    def __str__(self):
+        student_email = getattr(self.student, "email", "") or f"user#{self.student_id}"
+        peer_email = getattr(self.peer, "email", "") or f"user#{self.peer_id}"
+        return f"{student_email} <-> {peer_email}"

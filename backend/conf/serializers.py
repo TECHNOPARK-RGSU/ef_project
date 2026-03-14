@@ -19,7 +19,8 @@ from conf.models import (
     ExpertAssignmentItem,
 )
 from users.serializers import UserSerializer
-from users.models import User
+from users.models import StudentPeerLink, TutorStudentAccess, User
+from utils.roles import is_student_role, normalize_role_code
 
 
 class PlaceSerializer(serializers.ModelSerializer):
@@ -393,6 +394,93 @@ class ProjectSerializer(serializers.ModelSerializer):
             "is_archived",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        request_role_code = normalize_role_code(getattr(getattr(request_user, "role", None), "code", ""))
+        leader = attrs.get("leader", getattr(self.instance, "leader", None))
+        tutor = attrs.get("tutor", getattr(self.instance, "tutor", None))
+        members = attrs.get("members")
+
+        if leader is not None:
+            leader_role_code = normalize_role_code(getattr(leader.role, "code", ""))
+            if not is_student_role(leader_role_code):
+                raise serializers.ValidationError(
+                    {"leader_id": "Руководителем проекта может быть только пользователь с ролью ученика."}
+                )
+
+        if members is not None:
+            member_ids = [member.id for member in members]
+            if leader is not None and leader.id in member_ids:
+                raise serializers.ValidationError(
+                    {"member_ids": "Руководитель не должен повторяться в списке участников."}
+                )
+            invalid_members = [
+                member.id
+                for member in members
+                if not is_student_role(normalize_role_code(getattr(member.role, "code", "")))
+            ]
+            if invalid_members:
+                raise serializers.ValidationError(
+                    {"member_ids": "В участниках проекта могут быть только ученики."}
+                )
+
+        if is_student_role(request_role_code):
+            if leader is not None and request_user and leader.id != request_user.id:
+                raise serializers.ValidationError(
+                    {"leader_id": "Ученик может подавать проект только от своего имени."}
+                )
+            if members is not None and request_user:
+                allowed_peer_ids = set(
+                    StudentPeerLink.objects.filter(
+                        student=request_user,
+                        is_archived=False,
+                    ).values_list("peer_id", flat=True)
+                )
+                disallowed_members = [member.id for member in members if member.id not in allowed_peer_ids]
+                if disallowed_members:
+                    raise serializers.ValidationError(
+                        {"member_ids": "Можно выбирать только привязанных учеников."}
+                    )
+
+        if tutor is None and leader is not None:
+            tutor = (
+                TutorStudentAccess.objects.filter(student=leader, is_archived=False)
+                .order_by("-updated_at", "-id")
+                .select_related("tutor")
+                .first()
+            )
+            if tutor is not None:
+                attrs["tutor"] = tutor.tutor
+                tutor = tutor.tutor
+
+        if tutor is None:
+            return attrs
+
+        tutor_role_code = normalize_role_code(getattr(tutor.role, "code", ""))
+        if tutor_role_code != "tutor":
+            raise serializers.ValidationError(
+                {"tutor_id": "Указанный пользователь не является наставником."}
+            )
+
+        if leader is None:
+            raise serializers.ValidationError(
+                {"tutor_id": "Нельзя выбрать наставника без указания руководителя проекта."}
+            )
+
+        should_validate_access = self.instance is None or "tutor" in attrs or "leader" in attrs
+        if should_validate_access:
+            is_allowed = TutorStudentAccess.objects.filter(
+                tutor=tutor,
+                student=leader,
+                is_archived=False,
+            ).exists()
+            if not is_allowed:
+                raise serializers.ValidationError(
+                    {"tutor_id": "Этот наставник не открыл выбор для выбранного участника."}
+                )
+        return attrs
 
 
 class CommentSerializer(serializers.ModelSerializer):

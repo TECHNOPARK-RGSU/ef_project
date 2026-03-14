@@ -25,7 +25,7 @@ from conf.models import (
     Section,
 )
 from conf.services.results import calculate_results_for_conference
-from users.models import EducationalOrganization, Role, User
+from users.models import EducationalOrganization, Role, StudentPeerLink, TutorStudentAccess, User
 
 
 class Command(BaseCommand):
@@ -33,8 +33,17 @@ class Command(BaseCommand):
 
     DEFAULT_PASSWORD = "password123"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--scale",
+            type=int,
+            default=3,
+            help="Multiplier for amount of demo users/projects.",
+        )
+
     def handle(self, *args, **options):
-        randomizer = Random(42)
+        self.scale = max(1, int(options.get("scale", 3)))
+        randomizer = Random(42 + self.scale)
 
         roles = self._seed_roles()
         organizations = self._seed_organizations()
@@ -43,6 +52,8 @@ class Command(BaseCommand):
         stages = self._seed_stages()
         presentations = self._seed_places_and_presentations()
         users = self._seed_users(roles, organizations)
+        self._seed_tutor_student_access(users)
+        self._seed_student_peer_links(users)
         conferences = self._seed_conferences(users["organizers"])
         sections = self._seed_sections(conferences, age_categories)
         criteria = self._seed_criteria(conferences)
@@ -53,6 +64,14 @@ class Command(BaseCommand):
             stages=stages,
             presentations=presentations,
         )
+        projects = self._seed_required_demo_projects(
+            users=users,
+            sections=sections,
+            statuses=statuses,
+            stages=stages,
+            presentations=presentations,
+            projects=projects,
+        )
 
         self._seed_comments(projects, users["experts"], statuses)
         self._seed_scores(projects, criteria, users["experts"], statuses, randomizer)
@@ -62,6 +81,7 @@ class Command(BaseCommand):
             self._recalculate_results(conference)
 
         self._print_tokens(users)
+        self.stdout.write(self.style.SUCCESS(f"Seed scale: {self.scale}"))
         self.stdout.write(self.style.SUCCESS(f"Demo data seeded. Password for demo users: {self.DEFAULT_PASSWORD}"))
 
     def _seed_roles(self) -> dict[str, Role]:
@@ -70,6 +90,8 @@ class Command(BaseCommand):
             "expert": ("Эксперт", "expert"),
             "tutor": ("Наставник", "tutor"),
             "student": ("Ученик", "student"),
+            "student2": ("Ученик 2", "student2"),
+            "student3": ("Ученик 3", "student3"),
         }
         roles: dict[str, Role] = {}
         for key, (name, code) in role_map.items():
@@ -209,6 +231,54 @@ class Command(BaseCommand):
             ("student24@example.com", "Степан", "Елисеев", "Владимирович"),
         ]
 
+        expert_first = ["Иван", "Артем", "Глеб", "Виктор", "Антон", "Михаил", "Никита", "Юлия", "Лариса", "Оксана"]
+        expert_last = ["Соловьев", "Панфилов", "Данилов", "Колесников", "Шубин", "Лаптев", "Седов", "Морозова", "Яковенко", "Сафонова"]
+        expert_middle = ["Александрович", "Игоревич", "Максимович", "Петрович", "Сергеевич", "Олегович", "Владимирович", "Дмитриевна", "Романовна", "Ильинична"]
+        tutor_first = ["Елизавета", "Кирилл", "Галина", "Валерий", "Людмила", "Руслан", "Ангелина", "Юрий", "Вера", "Григорий"]
+        tutor_last = ["Мельникова", "Сомов", "Бурова", "Карпов", "Филимонова", "Агафонов", "Калинина", "Шаповалов", "Ерофеева", "Захаров"]
+        tutor_middle = ["Владимировна", "Петрович", "Николаевна", "Андреевич", "Юрьевна", "Михайлович", "Ивановна", "Сергеевич", "Викторовна", "Олегович"]
+        student_first = ["Анна", "Михаил", "Яна", "Петр", "Ева", "Денис", "Лидия", "Роман", "Маргарита", "Лев", "Дарина", "Федор"]
+        student_last = ["Кузьмина", "Маслов", "Новикова", "Чернов", "Семенова", "Грищенко", "Макарова", "Щербаков", "Киселева", "Гордеев", "Панкратова", "Субботин"]
+        student_middle = ["Игоревна", "Андреевич", "Сергеевна", "Владимирович", "Дмитриевна", "Романович", "Павловна", "Олегович", "Евгеньевна", "Никитич", "Артемовна", "Семенович"]
+
+        target_experts = max(len(experts_data), 6 * self.scale)
+        target_tutors = max(len(tutors_data), 10 * self.scale)
+        target_students = max(len(students_data), 48 * self.scale)
+
+        if target_experts > len(experts_data):
+            experts_data.extend(
+                self._generate_people(
+                    prefix="expert_auto",
+                    start_index=1,
+                    count=target_experts - len(experts_data),
+                    first_names=expert_first,
+                    last_names=expert_last,
+                    middle_names=expert_middle,
+                )
+            )
+        if target_tutors > len(tutors_data):
+            tutors_data.extend(
+                self._generate_people(
+                    prefix="tutor_auto",
+                    start_index=1,
+                    count=target_tutors - len(tutors_data),
+                    first_names=tutor_first,
+                    last_names=tutor_last,
+                    middle_names=tutor_middle,
+                )
+            )
+        if target_students > len(students_data):
+            students_data.extend(
+                self._generate_people(
+                    prefix="student_auto",
+                    start_index=1,
+                    count=target_students - len(students_data),
+                    first_names=student_first,
+                    last_names=student_last,
+                    middle_names=student_middle,
+                )
+            )
+
         users: dict[str, list[User]] = {
             "organizers": [],
             "experts": [],
@@ -243,7 +313,7 @@ class Command(BaseCommand):
                 )
             )
 
-        student_roles = [roles["student"]]
+        student_roles = [roles["student"], roles["student2"], roles["student3"]]
         for idx, payload in enumerate(students_data):
             users["students"].append(
                 self._get_or_create_user(
@@ -423,6 +493,7 @@ class Command(BaseCommand):
             "Интерактивная карта площадок очной защиты",
             "Модуль публикации итогов и формирования протоколов",
         ]
+        templates = self._expand_project_titles(templates)
 
         conference_keys = list(sections.keys())
         students = users["students"]
@@ -610,6 +681,254 @@ class Command(BaseCommand):
                     assignment=assignments[expert.id],
                     project=project,
                 )
+
+    def _seed_tutor_student_access(self, users: dict[str, list[User]]):
+        tutors = users["tutors"]
+        students = users["students"]
+        if not tutors or not students:
+            return
+
+        students_per_tutor = max(8, min(20, len(students) // max(1, len(tutors)) + 4))
+        for index, tutor in enumerate(tutors):
+            allowed_ids = {
+                students[(index + shift * len(tutors)) % len(students)].id
+                for shift in range(students_per_tutor)
+            }
+            self._sync_tutor_allowed_students(tutor, allowed_ids)
+
+        tutor01 = next((item for item in tutors if item.email == "tutor01@example.com"), None)
+        student01 = next((item for item in students if item.email == "student01@example.com"), None)
+        if tutor01 and student01:
+            link, created = TutorStudentAccess.objects.get_or_create(
+                tutor=tutor01,
+                student=student01,
+                defaults={"is_archived": False},
+            )
+            if not created and link.is_archived:
+                link.is_archived = False
+                link.save(update_fields=["is_archived"])
+
+    def _seed_student_peer_links(self, users: dict[str, list[User]]):
+        students = users["students"]
+        if len(students) < 2:
+            return
+
+        for index, student in enumerate(students):
+            peer_ids = {
+                students[(index + 1) % len(students)].id,
+                students[(index + 2) % len(students)].id,
+            }
+            for peer_id in peer_ids:
+                for left_id, right_id in ((student.id, peer_id), (peer_id, student.id)):
+                    link, created = StudentPeerLink.objects.get_or_create(
+                        student_id=left_id,
+                        peer_id=right_id,
+                        defaults={"is_archived": False},
+                    )
+                    if not created and link.is_archived:
+                        link.is_archived = False
+                        link.save(update_fields=["is_archived"])
+
+    def _sync_tutor_allowed_students(self, tutor: User, student_ids: set[int]):
+        current_active_ids = set(
+            TutorStudentAccess.objects.filter(
+                tutor=tutor,
+                is_archived=False,
+            ).values_list("student_id", flat=True)
+        )
+        to_archive = current_active_ids - student_ids
+        if to_archive:
+            TutorStudentAccess.objects.filter(
+                tutor=tutor,
+                student_id__in=to_archive,
+                is_archived=False,
+            ).update(is_archived=True)
+
+        to_activate = student_ids - current_active_ids
+        for student_id in to_activate:
+            link, created = TutorStudentAccess.objects.get_or_create(
+                tutor=tutor,
+                student_id=student_id,
+                defaults={"is_archived": False},
+            )
+            if not created and link.is_archived:
+                link.is_archived = False
+                link.save(update_fields=["is_archived"])
+
+    def _seed_required_demo_projects(
+        self,
+        users: dict[str, list[User]],
+        sections: dict[str, list[Section]],
+        statuses: dict[str, ProjectStatus],
+        stages: dict[str, ParticipationStage],
+        presentations: dict[str, PresentationType],
+        projects: list[Project],
+    ) -> list[Project]:
+        organizer = next((item for item in users["organizers"] if item.email == "organizer01@example.com"), None)
+        expert = next((item for item in users["experts"] if item.email == "expert01@example.com"), None)
+        tutor = next((item for item in users["tutors"] if item.email == "tutor01@example.com"), None)
+        student = next((item for item in users["students"] if item.email == "student01@example.com"), None)
+        if not tutor or not student:
+            return projects
+
+        science_sections = sections.get("science_days") or []
+        if not science_sections:
+            return projects
+
+        primary_section = science_sections[0]
+        first_member = next((item for item in users["students"] if item.email == "student02@example.com"), None)
+
+        demo_specs = [
+            {
+                "title": "Демо-проект: Личный кабинет участника конференции",
+                "status": statuses["approved"],
+                "stage": stages["qualifying"],
+                "presentation_type": presentations["online"],
+                "description": "Проверочный проект для сценария подачи заявок и взаимодействия с наставником.",
+            },
+            {
+                "title": "Демо-проект: Панель эксперта для оценки докладов",
+                "status": statuses["in_review"],
+                "stage": stages["qualifying"],
+                "presentation_type": presentations["oral"],
+                "description": "Проверочный проект для сценария рецензирования и выставления оценок.",
+            },
+        ]
+
+        existing_by_id = {project.id for project in projects}
+        for spec in demo_specs:
+            project, _ = Project.objects.get_or_create(
+                title=spec["title"],
+                section=primary_section,
+                leader=student,
+                defaults={
+                    "description": spec["description"],
+                    "additional_info": "Связанный демонстрационный проект с ролями organizer/expert/tutor/student.",
+                    "tutor": tutor,
+                    "status": spec["status"],
+                    "stage": spec["stage"],
+                    "presentation_type": spec["presentation_type"],
+                },
+            )
+            updates = []
+            if project.tutor_id != tutor.id:
+                project.tutor = tutor
+                updates.append("tutor")
+            if project.status_id != spec["status"].id:
+                project.status = spec["status"]
+                updates.append("status")
+            if project.stage_id != spec["stage"].id:
+                project.stage = spec["stage"]
+                updates.append("stage")
+            if project.presentation_type_id != spec["presentation_type"].id:
+                project.presentation_type = spec["presentation_type"]
+                updates.append("presentation_type")
+            if updates:
+                project.save(update_fields=updates)
+
+            members = [first_member] if first_member else []
+            project.members.set([member for member in members if member and member.id != student.id])
+
+            if expert:
+                Comment.objects.get_or_create(
+                    project=project,
+                    author=expert,
+                    text="Проект включен в тестовый контур проверки для эксперта.",
+                )
+                assignment, _ = ExpertAssignment.objects.get_or_create(
+                    conference=primary_section.conference,
+                    expert=expert,
+                    stage="online" if project.presentation_type.code == "online" else "offline",
+                    defaults={"max_projects": 20},
+                )
+                ExpertAssignmentItem.objects.get_or_create(assignment=assignment, project=project)
+
+            if tutor:
+                Comment.objects.get_or_create(
+                    project=project,
+                    author=tutor,
+                    text="Подтверждаю, что ученик может выбрать меня руководителем.",
+                )
+            if organizer:
+                Comment.objects.get_or_create(
+                    project=project,
+                    author=organizer,
+                    text="Проект добавлен организатором в демонстрационный набор.",
+                )
+
+            if project.id not in existing_by_id:
+                projects.append(project)
+                existing_by_id.add(project.id)
+
+        return projects
+
+    def _generate_people(
+        self,
+        prefix: str,
+        start_index: int,
+        count: int,
+        first_names: list[str],
+        last_names: list[str],
+        middle_names: list[str],
+    ) -> list[tuple[str, str, str, str]]:
+        generated: list[tuple[str, str, str, str]] = []
+        for idx in range(start_index, start_index + count):
+            first_name = first_names[(idx - 1) % len(first_names)]
+            last_name = last_names[(idx - 1) % len(last_names)]
+            middle_name = middle_names[(idx - 1) % len(middle_names)]
+            email = f"{prefix}{idx:03d}@example.com"
+            generated.append((email, first_name, last_name, middle_name))
+        return generated
+
+    def _expand_project_titles(self, base_titles: list[str]) -> list[str]:
+        target_count = max(len(base_titles), 36 * self.scale)
+        titles = list(base_titles)
+        directions = [
+            "Цифровизация",
+            "Робототехника",
+            "Энергетика",
+            "Экология",
+            "Медицина",
+            "Социальная сфера",
+            "Городская среда",
+            "Образование",
+            "Транспорт",
+            "Управление",
+        ]
+        objectives = [
+            "мониторинга",
+            "прогнозирования",
+            "автоматизации",
+            "поддержки решений",
+            "оценки качества",
+            "аналитики",
+            "оптимизации",
+            "координации",
+            "планирования",
+            "рецензирования",
+        ]
+        domains = [
+            "учебных проектов",
+            "конференционных заявок",
+            "инженерных прототипов",
+            "научных докладов",
+            "командной работы",
+            "образовательной инфраструктуры",
+            "экспертной проверки",
+            "оценочных критериев",
+            "очных защит",
+            "гибридных мероприятий",
+        ]
+
+        index = 1
+        while len(titles) < target_count:
+            i = index - 1
+            titles.append(
+                f"Платформа {objectives[i % len(objectives)]} {domains[i % len(domains)]} "
+                f"({directions[i % len(directions)]} #{index})"
+            )
+            index += 1
+        return titles
 
     def _select_presentation_type(
         self,

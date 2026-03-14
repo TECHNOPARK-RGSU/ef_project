@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from users.models import EducationalOrganization, Role, User
+from users.models import EducationalOrganization, Role, StudentPeerLink, TutorStudentAccess, User
 
 
 class EducationalOrganizationSerializer(serializers.ModelSerializer):
@@ -54,6 +54,9 @@ class UserSerializer(serializers.ModelSerializer):
         source="role",
         write_only=True,
     )
+    allowed_student_ids = serializers.SerializerMethodField(read_only=True)
+    scientific_supervisor_id = serializers.SerializerMethodField(read_only=True)
+    peer_student_ids = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
@@ -71,6 +74,9 @@ class UserSerializer(serializers.ModelSerializer):
             "educational_organization_id",
             "role",
             "role_id",
+            "allowed_student_ids",
+            "scientific_supervisor_id",
+            "peer_student_ids",
             "created_at",
             "updated_at",
             "is_archived",
@@ -98,6 +104,33 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+    def get_allowed_student_ids(self, obj: User) -> list[int]:
+        role_code = (getattr(obj.role, "code", "") or "").lower()
+        if role_code != "tutor":
+            return []
+        return list(
+            TutorStudentAccess.objects.filter(tutor=obj, is_archived=False).values_list("student_id", flat=True)
+        )
+
+    def get_scientific_supervisor_id(self, obj: User) -> int | None:
+        role_code = (getattr(obj.role, "code", "") or "").lower()
+        if role_code not in {"student", "student2", "student3"}:
+            return None
+        return (
+            TutorStudentAccess.objects.filter(student=obj, is_archived=False)
+            .order_by("-updated_at", "-id")
+            .values_list("tutor_id", flat=True)
+            .first()
+        )
+
+    def get_peer_student_ids(self, obj: User) -> list[int]:
+        role_code = (getattr(obj.role, "code", "") or "").lower()
+        if role_code not in {"student", "student2", "student3"}:
+            return []
+        return list(
+            StudentPeerLink.objects.filter(student=obj, is_archived=False).values_list("peer_id", flat=True)
+        )
 
 
 REGISTRATION_ALLOWED_ROLES = ("student", "tutor", "expert")
