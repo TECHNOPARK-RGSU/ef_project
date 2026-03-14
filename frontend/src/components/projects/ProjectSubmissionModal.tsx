@@ -86,6 +86,10 @@ export function ProjectSubmissionModal({
         setStages(loadedStages);
         setPresentationTypes(loadedPresentationTypes);
         setTeams(loadedTeams);
+        setForm(current => ({
+          ...current,
+          teamId: loadedTeams.length ? String(loadedTeams[0].id) : "none",
+        }));
         setLoadState("ready");
       } catch {
         if (!controller.signal.aborted) setLoadState("error");
@@ -183,7 +187,8 @@ export function ProjectSubmissionModal({
               <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Подача заявки</p>
               <CardTitle className="text-lg">{conference.title}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Выберите команду при наличии. Если команда не выбрана, заявка будет индивидуальной.
+                Выберите команду, к которой вас привязал наставник по email. Научный руководитель и состав заявки
+                подставятся автоматически.
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -208,7 +213,7 @@ export function ProjectSubmissionModal({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Команда наставника</Label>
+                  <Label>Команда, от которой подается заявка</Label>
                   <Select
                     value={form.teamId}
                     onValueChange={value => setForm(current => ({ ...current, teamId: value }))}
@@ -231,17 +236,29 @@ export function ProjectSubmissionModal({
                   {selectedTeam ? (
                     <div className="space-y-2">
                       <p>
-                        <span className="text-muted-foreground">Наставник:</span>{" "}
+                        <span className="text-muted-foreground">Научный руководитель:</span>{" "}
                         {getUserName(selectedTeam.tutor?.last_name, selectedTeam.tutor?.first_name)}
+                        {selectedTeam.tutor?.email ? ` (${selectedTeam.tutor.email})` : ""}
                       </p>
-                      <p>
-                        <span className="text-muted-foreground">Состав команды:</span>{" "}
-                        {(selectedTeam.members ?? []).map(member => getUserName(member.last_name, member.first_name)).join(", ") || "—"}
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Состав команды</p>
+                        <ul className="space-y-1">
+                          {(selectedTeam.members ?? []).map(member => (
+                            <li key={member.id}>
+                              {getUserName(member.last_name, member.first_name)}
+                              {member.email ? ` (${member.email})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
+                  ) : teams.length ? (
+                    <p className="text-muted-foreground">
+                      Можно подать заявку индивидуально или выбрать одну из доступных команд наставника.
+                    </p>
                   ) : (
                     <p className="text-muted-foreground">
-                      Будет создана индивидуальная заявка только от вашего имени.
+                      Наставник еще не привязал вас к команде по email. Сейчас доступна только индивидуальная заявка.
                     </p>
                   )}
                 </div>

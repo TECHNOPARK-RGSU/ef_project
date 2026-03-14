@@ -26,6 +26,10 @@ import "./index.css";
 
 export function App() {
   const [location, setLocation] = useLocation();
+  const pathname = useMemo(() => {
+    const [path] = location.split("?");
+    return path || "/";
+  }, [location]);
   const token = getAuthToken();
   const [authUser, setAuthUser] = useState<AuthUserInfo | null>(() => getAuthUserInfo());
   const [authState, setAuthState] = useState<"idle" | "loading" | "ready">(
@@ -119,19 +123,19 @@ export function App() {
   };
 
   useEffect(() => {
-    if (!token && location !== "/login" && location !== "/register" && location !== "/") {
-      if (["/policy", "/contacts", "/documents"].includes(location)) return;
+    if (!token && pathname !== "/login" && pathname !== "/register" && pathname !== "/") {
+      if (["/policy", "/contacts", "/documents"].includes(pathname)) return;
       setLocation("/login");
       return;
     }
-    if (token && authState === "ready" && (location === "/login" || location === "/register")) {
+    if (token && authState === "ready" && (pathname === "/login" || pathname === "/register")) {
       setLocation(defaultPath);
       return;
     }
-    if (token && authState === "ready" && !isAllowedPath(location)) {
+    if (token && authState === "ready" && !isAllowedPath(pathname)) {
       setLocation(defaultPath);
     }
-  }, [authState, defaultPath, location, setLocation, token]);
+  }, [authState, defaultPath, pathname, setLocation, token]);
 
   return (
     <SiteLayout roleCode={roleCode} userLogin={authUser?.email}>

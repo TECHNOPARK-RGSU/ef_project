@@ -89,6 +89,10 @@ export function ApplyPage() {
   const conferenceQuery = conferenceIdFromRoute != null ? `?conference=${conferenceIdFromRoute}` : "";
 
   useEffect(() => {
+    if (isStudent) {
+      setState("ready");
+      return;
+    }
     const controller = new AbortController();
     const load = async () => {
       setState("loading");
@@ -116,7 +120,7 @@ export function ApplyPage() {
 
     load();
     return () => controller.abort();
-  }, [conferenceIdFromRoute]);
+  }, [conferenceIdFromRoute, isStudent]);
 
   const visibleStatuses = useMemo(() => statuses.slice(0, 4).map(status => status.name), [statuses]);
   const stageAvailabilityByConference = useMemo(() => {
@@ -178,12 +182,12 @@ export function ApplyPage() {
   }, [location]);
   useEffect(() => {
     if (!isStudent) return;
-    if (conferenceIdFromRoute != null && shouldAutoOpenCreate) {
+    if (conferenceIdFromRoute != null) {
       setLocation(`/conferences?apply=${conferenceIdFromRoute}`);
       return;
     }
-    setLocation("/my-projects");
-  }, [conferenceIdFromRoute, isStudent, setLocation, shouldAutoOpenCreate]);
+    setLocation("/conferences");
+  }, [conferenceIdFromRoute, isStudent, setLocation]);
   useEffect(() => {
     setAutoCreateHandled(false);
   }, [location]);
