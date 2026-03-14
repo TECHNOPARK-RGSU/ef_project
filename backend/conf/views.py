@@ -1,11 +1,11 @@
 import os
 import tempfile
 import zipfile
+from urllib.parse import quote
 
 from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
-from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
@@ -59,6 +59,24 @@ from users.models import User
 from conf.services.results import calculate_results_for_conference
 from utils.permissions import RoleBasedPermission
 from users.models import User
+
+
+def _sanitize_download_name(value: str, fallback: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return fallback
+    cleaned = cleaned.replace("/", " ").replace("\\", " ")
+    cleaned = "".join(char for char in cleaned if ord(char) >= 32)
+    cleaned = cleaned.strip().strip(".")
+    return cleaned or fallback
+
+
+def _content_disposition(filename: str) -> str:
+    encoded = quote(filename)
+    ascii_fallback = (
+        filename.encode("ascii", "ignore").decode("ascii").strip() or "download"
+    )
+    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
 class PlaceViewSet(viewsets.ModelViewSet):
@@ -838,7 +856,19 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
         if role_code == "expert" and assignment.expert_id != user.id:
             return Response({"detail": "Forbidden"}, status=403)
 
-        items = assignment.items.select_related("project")
+        items = assignment.items.select_related("project").order_by(
+            "project__title",
+            "project_id",
+        )
+        used_folder_names: set[str] = set()
+        archive_filename = (
+            _sanitize_download_name(
+                getattr(assignment.conference, "title", ""),
+                f"conference-{assignment.conference_id}",
+            )
+            + ".zip"
+        )
+
         with tempfile.NamedTemporaryFile(suffix=".zip") as tmpfile:
             with zipfile.ZipFile(tmpfile, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for item in items:
@@ -846,15 +876,22 @@ class ExpertAssignmentViewSet(viewsets.ModelViewSet):
                     if not project.files:
                         continue
                     filename = os.path.basename(project.files.name)
-                    safe_title = slugify(project.title) or f"project-{project.id}"
-                    arcname = f"{safe_title}-{project.id}-{filename}"
+                    folder_name = _sanitize_download_name(
+                        project.title,
+                        f"Проект {project.id}",
+                    )
+                    original_folder_name = folder_name
+                    duplicate_index = 2
+                    while folder_name in used_folder_names:
+                        folder_name = f"{original_folder_name} ({duplicate_index})"
+                        duplicate_index += 1
+                    used_folder_names.add(folder_name)
+                    arcname = f"{folder_name}/{filename}"
                     with project.files.open("rb") as file_obj:
                         zipf.writestr(arcname, file_obj.read())
             tmpfile.seek(0)
             response = HttpResponse(tmpfile.read(), content_type="application/zip")
-            response["Content-Disposition"] = (
-                f'attachment; filename="assignment_{assignment.id}.zip"'
-            )
+            response["Content-Disposition"] = _content_disposition(archive_filename)
             return response
 
 

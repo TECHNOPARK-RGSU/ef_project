@@ -179,10 +179,21 @@ export function AssignmentsPage() {
       setMessage("В назначении нет файлов для скачивания.");
       return;
     }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+    const plainMatch = disposition.match(/filename="?([^";\n]+)"?/i);
+    let decodedFilename = plainMatch?.[1] ?? `assignment_${assignmentId}.zip`;
+    if (utf8Match?.[1]) {
+      try {
+        decodedFilename = decodeURIComponent(utf8Match[1]);
+      } catch {
+        decodedFilename = plainMatch?.[1] ?? decodedFilename;
+      }
+    }
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `assignment_${assignmentId}.zip`;
+    link.download = decodedFilename;
     link.click();
     window.URL.revokeObjectURL(url);
   };

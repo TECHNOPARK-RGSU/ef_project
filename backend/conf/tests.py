@@ -1,9 +1,18 @@
+import io
+import tempfile
+import zipfile
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test.utils import override_settings
+from rest_framework.test import APIClient
 
 from conf.models import (
     AgeCategory,
     Conference,
     EvaluationCriterion,
+    ExpertAssignment,
+    ExpertAssignmentItem,
     ParticipationStage,
     Place,
     PresentationType,
@@ -306,3 +315,88 @@ class ProjectTeamValidationTests(TestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("team_id", serializer.errors)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ExpertAssignmentDownloadZipTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.expert_role = Role.objects.create(name="Эксперт", code="expert")
+        self.student_role = Role.objects.create(name="Ученик", code="student")
+        self.expert = User.objects.create_user(
+            email="expert-zip@example.com",
+            password="password",
+            role=self.expert_role,
+            first_name="Ирина",
+            last_name="Эксперт",
+        )
+        self.student = User.objects.create_user(
+            email="student-zip@example.com",
+            password="password",
+            role=self.student_role,
+            first_name="Павел",
+            last_name="Ученик",
+        )
+        self.conference = Conference.objects.create(
+            title="Инженеры будущего 2026",
+            start_date="2026-04-10",
+            end_date="2026-04-12",
+        )
+        self.category = AgeCategory.objects.create(name="14-17", min_age=14, max_age=17)
+        self.section = Section.objects.create(
+            name="Робототехника",
+            conference=self.conference,
+            category=self.category,
+        )
+        self.status = ProjectStatus.objects.create(name="Новый", code="new")
+        self.stage = ParticipationStage.objects.create(name="Заочный", code="online")
+        self.place = Place.objects.create(name="Аудитория 101", address="ул. Науки, 1")
+        self.presentation_type = PresentationType.objects.create(
+            name="Доклад",
+            code="oral",
+            place=self.place,
+        )
+        self.assignment = ExpertAssignment.objects.create(
+            conference=self.conference,
+            expert=self.expert,
+            stage="online",
+        )
+        self.project_a = Project.objects.create(
+            title="Адаптивный робот",
+            leader=self.student,
+            section=self.section,
+            status=self.status,
+            stage=self.stage,
+            presentation_type=self.presentation_type,
+            files=SimpleUploadedFile("robot.pdf", b"robot"),
+        )
+        self.project_b = Project.objects.create(
+            title="Беспилотная платформа",
+            leader=self.student,
+            section=self.section,
+            status=self.status,
+            stage=self.stage,
+            presentation_type=self.presentation_type,
+            files=SimpleUploadedFile("platform.pdf", b"platform"),
+        )
+        ExpertAssignmentItem.objects.create(assignment=self.assignment, project=self.project_b)
+        ExpertAssignmentItem.objects.create(assignment=self.assignment, project=self.project_a)
+
+    def test_download_zip_uses_conference_name_and_project_folders(self):
+        self.client.force_authenticate(self.expert)
+
+        response = self.client.get(
+            f"/api/conf/assignments/{self.assignment.id}/download_zip/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("filename*=UTF-8''%D0%98%D0%BD%D0%B6%D0%B5%D0%BD%D0%B5%D1%80%D1%8B%20%D0%B1%D1%83%D0%B4%D1%83%D1%89%D0%B5%D0%B3%D0%BE%202026.zip", response["Content-Disposition"])
+
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [
+                    "Адаптивный робот/robot.pdf",
+                    "Беспилотная платформа/platform.pdf",
+                ],
+            )
