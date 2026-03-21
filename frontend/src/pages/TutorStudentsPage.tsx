@@ -338,10 +338,6 @@ export function TutorStudentsPage() {
     }
   };
 
-  const downloadFile = (projectId: number) => {
-    window.open(`${API_BASE_URL}/api/conf/projects/${projectId}/download_file/`, "_blank");
-  };
-
   const availableSections = useMemo(() => {
     if (!form.sectionId) return sectionsForConference;
     const section = sections.find(s => String(s.id) === form.sectionId);
@@ -554,15 +550,6 @@ export function TutorStudentsPage() {
                       <Button size="sm" variant="secondary" onClick={() => openProject(project)}>
                         Открыть
                       </Button>
-                      {project.files ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadFile(project.id)}
-                        >
-                          Скачать
-                        </Button>
-                      ) : null}
                     </CardContent>
                   </Card>
                 ))}

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { API_BASE_URL, fetchList, fetchPage } from "@/lib/api";
+import { fetchList, fetchPage } from "@/lib/api";
 import { getAuthToken, getAuthUserInfo } from "@/lib/auth";
 import { formatDateRange } from "@/lib/format";
 import { isStudentRole } from "@/lib/roles";
@@ -221,10 +221,6 @@ export function MyProjectsPage() {
     }
   };
 
-  const downloadFile = (projectId: number) => {
-    window.open(`${API_BASE_URL}/api/conf/projects/${projectId}/download_file/`, "_blank");
-  };
-
   const availableSections = useMemo(() => {
     if (!form.sectionId) return sectionsForConference;
     const section = sections.find(s => String(s.id) === form.sectionId);
@@ -379,15 +375,6 @@ export function MyProjectsPage() {
                         <Button size="sm" variant="secondary" onClick={() => openProject(project)}>
                           Открыть
                         </Button>
-                        {project.files ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => downloadFile(project.id)}
-                          >
-                            Скачать
-                          </Button>
-                        ) : null}
                       </CardContent>
                     </Card>
                   ))}
