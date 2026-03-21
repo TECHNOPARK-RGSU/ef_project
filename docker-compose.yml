@@ -30,4 +30,4 @@ services:
     build:
       context: ./frontend
     ports:
-      - "26110:80"
+      - "26110:8080"

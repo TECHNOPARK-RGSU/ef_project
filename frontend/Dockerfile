@@ -1,5 +1,5 @@
 ARG NODE_BASE_IMAGE=public.ecr.aws/bitnami/node:22
-ARG NGINX_BASE_IMAGE=public.ecr.aws/docker/library/nginx:alpine
+
 FROM ${NODE_BASE_IMAGE} AS build
 
 WORKDIR /app
@@ -14,9 +14,16 @@ COPY src ./src
 RUN bun install --frozen-lockfile
 RUN bun run build.ts
 
-FROM ${NGINX_BASE_IMAGE}
+FROM ${NODE_BASE_IMAGE}
 
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-EXPOSE 80
+ENV NODE_ENV=production \
+    PORT=8080
+
+COPY --from=build /app/dist ./dist
+COPY serve.mjs ./serve.mjs
+
+EXPOSE 8080
+
+CMD ["node", "/app/serve.mjs"]
