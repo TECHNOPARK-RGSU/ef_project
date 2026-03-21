@@ -1,4 +1,4 @@
-ARG NODE_BASE_IMAGE=public.ecr.aws/docker/library/node:22-alpine
+ARG NODE_BASE_IMAGE=public.ecr.aws/bitnami/node:22
 ARG NGINX_BASE_IMAGE=public.ecr.aws/nginx/nginx:alpine
 FROM ${NODE_BASE_IMAGE} AS build
 
