@@ -1,5 +1,5 @@
 ARG NODE_BASE_IMAGE=public.ecr.aws/bitnami/node:22
-ARG NGINX_BASE_IMAGE=public.ecr.aws/nginx/nginx:alpine
+ARG NGINX_BASE_IMAGE=public.ecr.aws/docker/library/nginx:alpine
 FROM ${NODE_BASE_IMAGE} AS build
 
 WORKDIR /app
