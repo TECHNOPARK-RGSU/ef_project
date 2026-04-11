@@ -119,6 +119,7 @@ export function ConferencesPage() {
   };
 
   const closeApplyModal = () => {
+    setProjectConference(null);
     setLocation("/conferences");
   };
 
@@ -363,7 +364,10 @@ export function ConferencesPage() {
           conference={projectConference}
           open
           onClose={closeApplyModal}
-          onSubmitted={() => setLocation("/my-projects")}
+          onSubmitted={() => {
+            setProjectConference(null);
+            setLocation("/my-projects");
+          }}
         />
       ) : null}
 

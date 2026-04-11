@@ -60,6 +60,7 @@ export function ProjectSubmissionModal({
     const controller = new AbortController();
     const load = async () => {
       setLoadState("loading");
+      setSubmitState("idle");
       setMessage(null);
       setForm({
         title: "",
@@ -171,6 +172,8 @@ export function ProjectSubmissionModal({
         return;
       }
       const created = (await response.json()) as Project;
+      setSubmitState("idle");
+      setMessage(null);
       onSubmitted(created);
     } catch {
       setMessage("Не удалось отправить заявку.");
